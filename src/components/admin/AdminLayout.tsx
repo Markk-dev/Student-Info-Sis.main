@@ -20,6 +20,7 @@ import { StudentsPage } from './StudentsPage';
 import { SettingsPage } from './SettingsPage';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Admin } from '@/lib/appwrite';
+import { LineSeparator } from '../ui/dotted-line';
 
 interface AdminLayoutProps {
   adminData: Admin;
@@ -86,11 +87,10 @@ export function AdminLayout({ adminData }: AdminLayoutProps) {
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full bg-background">
-        {/* Sidebar */}
         <Sidebar className="w-64 border-r bg-card">
-          <SidebarHeader className="border-b bg-background">
-            <div className="flex items-center gap-2 px-4 py-4">
-              <div className="bg-primary rounded-lg w-10 h-10 flex items-center justify-center">
+          <SidebarHeader className="flex-col px-2 py-2 -mt-2.5 bg-background">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="bg-primary rounded-lg w-9 h-9 flex items-center justify-center">
                 <QrCode className="h-6 w-6 text-primary-foreground" />
               </div>
               <div className="flex flex-col">
@@ -98,6 +98,7 @@ export function AdminLayout({ adminData }: AdminLayoutProps) {
                 <span className="text-sm text-muted-foreground">Admin Panel</span>
               </div>
             </div>
+            <LineSeparator />
           </SidebarHeader>
 
           <SidebarContent className="px-3 py-4">
@@ -151,12 +152,10 @@ export function AdminLayout({ adminData }: AdminLayoutProps) {
           </SidebarFooter>
         </Sidebar>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Header */}
-          <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex-1 flex flex-col min-w-0 py-2">
+          <header className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mb-1">
             <div className="flex h-16 items-center gap-4 px-6">
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-1">
                 <h1 className="text-2xl font-bold text-foreground">{getPageTitle()}</h1>
                 <p className="text-sm text-muted-foreground">{getPageDescription()}</p>
               </div>
@@ -171,8 +170,7 @@ export function AdminLayout({ adminData }: AdminLayoutProps) {
               </div>
             </div>
           </header>
-
-          {/* Page Content */}
+          <LineSeparator />
           <main className="flex-1 overflow-auto p-6 bg-background">
             <div className="max-w-7xl mx-auto">
               {renderPage()}

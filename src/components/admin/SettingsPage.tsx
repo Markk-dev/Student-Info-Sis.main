@@ -46,10 +46,14 @@ export function SettingsPage() {
     sessionTimeout: 30
   });
 
+  // Temporary workaround: use maxDailySpend as maintenance flag
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [cashiers, setCashiers] = useState<CashierAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddCashier, setShowAddCashier] = useState(false);
   const [showEditCashier, setShowEditCashier] = useState(false);
+  const [showDeleteCashier, setShowDeleteCashier] = useState(false);
+  const [deletingCashier, setDeletingCashier] = useState<CashierAccount | null>(null);
   const [editingCashier, setEditingCashier] = useState<CashierAccount | null>(null);
   const [newCashier, setNewCashier] = useState({
     name: '',
@@ -62,37 +66,73 @@ export function SettingsPage() {
     password: ''
   });
 
-  // Function to generate random administrator ID in format 000-000
+  
   const generateAdministratorId = () => {
     const firstPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     const secondPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     return `${firstPart}-${secondPart}`;
   };
 
-  // Load settings and cashiers from database
+  
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         
-        // Load admins/cashiers
+        
         const adminsResponse = await adminService.getAdmins();
-        const transformedCashiers: CashierAccount[] = adminsResponse.documents.map((admin: any) => ({
-          id: admin.$id,
-          name: admin.username, // Using username as name for now
-          username: admin.username,
-          administrator_id: admin.administrator_id,
-          isActive: admin.isActive,
-          lastLogin: admin.lastLogin ? new Date(admin.lastLogin) : undefined,
-          createdAt: new Date(admin.createdAt)
-        }));
+        const transformedCashiers: CashierAccount[] = adminsResponse.documents.map((admin: any) => {
+          
+          let lastLogin: Date | undefined;
+          let createdAt: Date;
+          
+          try {
+            if (admin.lastLogin) {
+              lastLogin = new Date(admin.lastLogin);
+              if (isNaN(lastLogin.getTime())) {
+                lastLogin = undefined; 
+              }
+            }
+          } catch (error) {
+            lastLogin = undefined;
+          }
+          
+          try {
+            createdAt = new Date(admin.createdAt);
+            if (isNaN(createdAt.getTime())) {
+              createdAt = new Date(); 
+            }
+          } catch (error) {
+            createdAt = new Date(); 
+          }
+          
+          return {
+            id: admin.$id,
+            name: admin.username, 
+            username: admin.username,
+            administrator_id: admin.administrator_id,
+            isActive: admin.isActive,
+            lastLogin: lastLogin,
+            createdAt: createdAt
+          };
+        });
         
         setCashiers(transformedCashiers);
         
-        // Load settings (if available)
+        
+        
         try {
           const settingsResponse = await settingsService.getSettings();
-          // We could map database settings here if needed
+          if (settingsResponse) {
+            setSettings(prev => ({
+              ...prev,
+              ...settingsResponse
+            }));
+            // Fix: Check if maxDailySpend is 0 (maintenance mode)
+            const isMaintenance = settingsResponse.maxDailySpend === 0;
+            setMaintenanceMode(isMaintenance);
+            console.log('Maintenance mode:', isMaintenance, 'maxDailySpend:', settingsResponse.maxDailySpend);
+          }
         } catch (error) {
           console.log('No settings found, using defaults');
         }
@@ -108,9 +148,22 @@ export function SettingsPage() {
     loadData();
   }, []);
 
-  const handleSettingChange = (key: string, value: any) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    toast.success('Setting updated successfully');
+  const handleSettingChange = async (key: string, value: any) => {
+    try {
+      
+      setSettings(prev => ({ ...prev, [key]: value }));
+      
+      
+      await settingsService.updateSettings({ [key]: value });
+      
+      toast.success('Setting updated successfully');
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      toast.error('Failed to update setting');
+      
+      
+      setSettings(prev => ({ ...prev, [key]: !value }));
+    }
   };
 
   const handleAddCashier = async () => {
@@ -176,8 +229,8 @@ export function SettingsPage() {
     setEditingCashier(cashier);
     setEditCashierData({
       name: cashier.name,
-      email: `${cashier.username}@university.edu`, // Reconstruct email from username
-      password: '' // Don't pre-fill password for security
+      email: `${cashier.username}@university.edu`, 
+      password: '' 
     });
     setShowEditCashier(true);
   };
@@ -193,7 +246,7 @@ export function SettingsPage() {
         email: editCashierData.email
       };
 
-      // Only update password if it's provided
+      
       if (editCashierData.password.trim()) {
         updateData.password = editCashierData.password;
       }
@@ -218,17 +271,41 @@ export function SettingsPage() {
     }
   };
 
+  const handleDeleteCashier = async () => {
+    if (!deletingCashier) return;
+
+    try {
+      await adminService.deleteAdmin(deletingCashier.id);
+      
+      setCashiers(prev => prev.filter(c => c.id !== deletingCashier.id));
+      setShowDeleteCashier(false);
+      setDeletingCashier(null);
+      toast.success('Cashier account deleted successfully');
+    } catch (error) {
+      console.error('Error deleting cashier:', error);
+      toast.error('Failed to delete cashier account');
+    }
+  };
+
+  const confirmDeleteCashier = (cashier: CashierAccount) => {
+    setDeletingCashier(cashier);
+    setShowDeleteCashier(true);
+  };
+
   const exportData = (type: string) => {
-    // Mock export functionality
+    
     toast.success(`${type} data exported successfully`);
   };
 
   const importData = () => {
-    // Mock import functionality
+    
     toast.success('Data imported successfully');
   };
 
   const formatDate = (date: Date) => {
+    if (!date || isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'short', 
@@ -237,6 +314,9 @@ export function SettingsPage() {
   };
 
   const formatTime = (date: Date) => {
+    if (!date || isNaN(date.getTime())) {
+      return 'Invalid Time';
+    }
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
       minute: '2-digit' 
@@ -275,59 +355,76 @@ export function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
-              General Settings
+              System Maintenance
             </CardTitle>
             <CardDescription>
-              Configure basic system preferences
+              Control system access and maintenance mode
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
-                <Input
-                  id="currency"
-                  value={settings.currency}
-                  onChange={(e) => handleSettingChange('currency', e.target.value)}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>System Maintenance Mode</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Temporarily close all login/register for the student side for system maintenance
+                  </p>
+                </div>
+                <Switch
+                  checked={maintenanceMode}
+                  onCheckedChange={async (checked: boolean) => {
+                    try {
+                      // Update database
+                      await settingsService.updateSettings({ maxDailySpend: checked ? 0 : 1000 });
+                      
+                      // Update local state
+                      setMaintenanceMode(checked);
+                      
+                      // Update settings state
+                      setSettings(prev => ({
+                        ...prev,
+                        maxDailySpend: checked ? 0 : 1000
+                      }));
+                      
+                      toast.success(`System maintenance ${checked ? 'enabled' : 'disabled'}`);
+                    } catch (error) {
+                      console.error('Failed to update maintenance mode:', error);
+                      toast.error('Failed to update maintenance mode');
+                    }
+                  }}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dateFormat">Date Format</Label>
-                <Input
-                  id="dateFormat"
-                  value={settings.dateFormat}
-                  onChange={(e) => handleSettingChange('dateFormat', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
-              <Input
-                id="timezone"
-                value={settings.timezone}
-                onChange={(e) => handleSettingChange('timezone', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="maxAmount">Max Transaction Amount</Label>
-              <Input
-                id="maxAmount"
-                type="number"
-                value={settings.maxTransactionAmount}
-                onChange={(e) => handleSettingChange('maxTransactionAmount', parseFloat(e.target.value))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-              <Input
-                id="sessionTimeout"
-                type="number"
-                value={settings.sessionTimeout}
-                onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
-              />
+              
+              {maintenanceMode && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-yellow-800">
+                        <strong>⚠️ Maintenance Mode Active:</strong> Student login and registration are currently disabled. 
+                        The system is temporarily closed for maintenance.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await settingsService.updateSettings({ maxDailySpend: 1000 });
+                          setMaintenanceMode(false);
+                          setSettings(prev => ({ ...prev, maxDailySpend: 1000 }));
+                          toast.success('Maintenance mode disabled');
+                        } catch (error) {
+                          console.error('Failed to disable maintenance mode:', error);
+                          toast.error('Failed to disable maintenance mode');
+                        }
+                      }}
+                      className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+                    >
+                      Disable Maintenance
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -520,6 +617,42 @@ export function SettingsPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Delete Cashier Confirmation Modal */}
+        <Dialog open={showDeleteCashier} onOpenChange={setShowDeleteCashier}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Cashier Account</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this cashier account? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">
+                  <strong>Warning:</strong> This will permanently remove the user account "{deletingCashier?.name}" from the system.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowDeleteCashier(false);
+                    setDeletingCashier(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleDeleteCashier}
+                >
+                  Delete Account
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
@@ -563,19 +696,27 @@ export function SettingsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <Badge
+                          variant={cashier.isActive ? 'destructive' : 'default'}
+                          className="cursor-pointer hover:opacity-80 transition-opacity text-xs px-2 py-1"
                           onClick={() => toggleCashierStatus(cashier.id)}
                         >
                           {cashier.isActive ? 'Deactivate' : 'Activate'}
-                        </Button>
+                        </Badge>
                         <Button 
                           variant="ghost" 
                           size="sm"
                           onClick={() => handleEditCashier(cashier)}
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => confirmDeleteCashier(cashier)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

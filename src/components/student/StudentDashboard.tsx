@@ -33,6 +33,22 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedPeriod, setSelectedPeriod] = useState('thisMonth');
+  const [isMaintenance, setIsMaintenance] = useState(false);
+
+  // Check maintenance mode
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      try {
+        const { settingsService } = await import('@/lib/services');
+        const maintenanceStatus = await settingsService.isSystemInMaintenance();
+        setIsMaintenance(maintenanceStatus);
+      } catch (error) {
+        console.error('Error checking maintenance status:', error);
+      }
+    };
+    
+    checkMaintenance();
+  }, []);
 
   // Load student transactions from database
   useEffect(() => {
@@ -207,12 +223,27 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Maintenance Mode Warning */}
+      {isMaintenance && (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+            <div>
+              <h3 className="font-semibold text-yellow-800">System Maintenance Active</h3>
+              <p className="text-sm text-yellow-700">
+                The system is currently under maintenance. Some features may be limited or unavailable.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Welcome Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Welcome back, {studentData.name}!</h1>
+        <div className='flex flex-col gap-2'>
+          <h1 className="text-3xl font-bold text-green-500">Welcome back, {studentData.name}!</h1>
           <p className="text-muted-foreground">
-            {studentData.course} • {studentData.yearLevel}
+           <span>Student ID:</span> {studentData.id}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -341,14 +372,14 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {transactions.slice(0, 5).map((transaction) => (
+            {transactions.slice(0, 5).map((transaction, index) => (
               <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex items-center space-x-4">
                   <div className="p-2 bg-primary/10 rounded-full">
                     <ShoppingCart className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium">Transaction #{transaction.id.slice(-6)}</p>
+                    <p className="font-medium">Transaction ID: <span className='text-muted-foreground'>{transaction.id}</span></p>
                     <p className="text-sm text-muted-foreground">
                       {formatDate(transaction.timestamp)} at {formatTime(transaction.timestamp)}
                     </p>

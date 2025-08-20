@@ -16,6 +16,21 @@ export function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
+    try {
+      
+      const { settingsService } = await import('@/lib/services');
+      const isMaintenance = await settingsService.isSystemInMaintenance();
+      
+      if (isMaintenance) {
+        toast.error('System is currently under maintenance. Please try again later.');
+        setIsLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking maintenance status:', error);
+      
+    }
+
     const studentId = (e.target as HTMLFormElement).studentId?.value;
     const password = (e.target as HTMLFormElement).password?.value;
 
@@ -26,10 +41,10 @@ export function LoginPage() {
     }
 
     try {
-      // Pass studentId directly to login function
+      
       const result = await authService.loginStudent(studentId, password);
       
-      // Login with the student data
+      
       await login('student', result.student);
       toast.success('Student login successful!');
     } catch (error: any) {
@@ -61,10 +76,10 @@ export function LoginPage() {
     }
 
     try {
-      // Pass administratorId directly to login function
+      
       const result = await authService.loginAdmin(adminId, password);
       
-      // Login with the admin data
+      
       await login('admin', result.admin);
       toast.success('Admin login successful!');
     } catch (error: any) {
@@ -90,7 +105,7 @@ export function LoginPage() {
       subtitle={activeTab === 'admin' ? 'Access administrator panel' : 'Access your student portal'}
     >
       {activeTab === 'admin' ? (
-        // Admin Login Form
+        
         <form onSubmit={handleAdminLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="adminId">Administrator ID</Label>
@@ -123,7 +138,7 @@ export function LoginPage() {
           </Button>
         </form>
       ) : (
-        // Student Login Form
+        
         <form onSubmit={handleStudentLogin} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="studentId">Student ID</Label>

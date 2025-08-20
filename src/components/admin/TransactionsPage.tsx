@@ -162,7 +162,7 @@ export function TransactionsPage() {
 
   const exportCSV = () => {
     // Create CSV content
-    const headers = ['Transaction ID', 'Student ID', 'Student Name', 'Course', 'Amount', 'Date', 'Time', 'Cashier', 'Status', 'Type'];
+    const headers = ['Transaction Number', 'Student ID', 'Student Name', 'Course', 'Amount', 'Date', 'Time', 'Cashier', 'Status', 'Type'];
     const csvContent = [
       headers.join(','),
       ...filteredTransactions.map(t => [
@@ -473,7 +473,7 @@ export function TransactionsPage() {
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="search"
-                  placeholder="Search by student name, ID, or transaction ID..."
+                  placeholder="Search by student name, ID, or transaction number..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -563,7 +563,7 @@ export function TransactionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Transaction ID</TableHead>
+                  <TableHead>Transaction Number</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Course</TableHead>
                   <TableHead>Amount</TableHead>
@@ -574,7 +574,7 @@ export function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransactions.map((transaction) => (
+                {filteredTransactions.map((transaction, index) => (
                   <TableRow key={transaction.id}>
                     <TableCell className="font-mono">{transaction.id}</TableCell>
                     <TableCell>
@@ -640,7 +640,7 @@ export function TransactionsPage() {
           <DialogHeader className="pb-4">
             <DialogTitle className="text-2xl font-bold">Transaction Details</DialogTitle>
             <DialogDescription className="text-base">
-              Transaction ID: <span className="font-mono font-medium">{selectedTransaction?.id}</span>
+              Transaction Number: <span className="font-mono font-medium ml-2">{selectedTransaction?.id}</span>
             </DialogDescription>
           </DialogHeader>
           
@@ -649,8 +649,12 @@ export function TransactionsPage() {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Transaction ID</Label>
-                  <p className="font-mono text-lg font-semibold mt-1">{selectedTransaction?.id}</p>
+                  <Label className="text-sm font-medium text-muted-foreground">Transaction Number</Label>
+                  <Input
+                    value={selectedTransaction?.id || ''}
+                    disabled
+                    className="bg-gray-50"
+                  />
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Student Name</Label>
@@ -732,6 +736,14 @@ export function TransactionsPage() {
           </DialogHeader>
           
           <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Transaction Number</Label>
+              <Input
+                value={editingTransaction?.id || ''}
+                disabled
+                className="bg-gray-50"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="edit-amount">Amount (₱)</Label>

@@ -5,10 +5,20 @@ import { Label } from '@/components/ui/label';
 import { AuthLayout } from './layout';
 import { toast } from 'sonner';
 import { authService } from '@/lib/services';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function RegisterPage() {
+  const { login } = useAuth();
+  
+  
+  const generateStudentId = () => {
+    const firstPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const secondPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `${firstPart}-${secondPart}`;
+  };
+
   const [formData, setFormData] = useState({
-    studentId: '',
+    studentId: generateStudentId(), 
     email: '',
     password: '',
     confirmPassword: '',
@@ -31,7 +41,22 @@ export function RegisterPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Validation
+    try {
+      // Check if system is in maintenance mode
+      const { settingsService } = await import('@/lib/services');
+      const isMaintenance = await settingsService.isSystemInMaintenance();
+      
+      if (isMaintenance) {
+        toast.error('System is currently under maintenance. Registration is temporarily disabled. Please try again later.');
+        setIsLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking maintenance status:', error);
+      // Continue with registration if we can't check maintenance status
+    }
+
+    
     if (!formData.studentId || !formData.email || !formData.password || !formData.confirmPassword || 
         !formData.firstName || !formData.lastName || !formData.course || !formData.yearLevel) {
       toast.error('Please fill in all fields');
@@ -39,7 +64,7 @@ export function RegisterPage() {
       return;
     }
 
-    // Email validation
+    
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       toast.error('Please enter a valid email address');
@@ -60,8 +85,8 @@ export function RegisterPage() {
     }
 
     try {
-      // Register student using Appwrite
-      await authService.registerStudent({
+      
+      const result = await authService.registerStudent({
         studentId: formData.studentId,
         email: formData.email,
         password: formData.password,
@@ -71,24 +96,30 @@ export function RegisterPage() {
         yearLevel: formData.yearLevel
       });
 
-      toast.success('Registration successful! You can now log in.');
       
-      // Reset form
-      setFormData({
-        studentId: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        firstName: '',
-        lastName: '',
-        course: '',
-        yearLevel: ''
-      });
+      const studentData = {
+        studentId: formData.studentId,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        course: formData.course,
+        yearLevel: formData.yearLevel,
+        isActive: true,
+        balance: 0
+      };
+      
+      await login('student', studentData);
+      
+      toast.success('Registration successful! Welcome to your dashboard.');
+      
+      
+      window.location.href = '/student/dashboard';
       
     } catch (error: any) {
       console.error('Registration error:', error);
       
-      // Handle specific Appwrite errors
+      
       if (error.code === 409) {
         toast.error('A user with this email already exists');
       } else if (error.code === 400) {
@@ -106,7 +137,7 @@ export function RegisterPage() {
   return (
     <AuthLayout
       activeTab="student"
-      onTabChange={() => {}} // No-op since we only have student registration
+      onTabChange={() => {}} 
       title="Student Registration"
       subtitle="Create your student account"
     >
@@ -142,15 +173,16 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-3">
-          <Label htmlFor="studentId" className="text-sm font-medium text-gray-700">Student ID</Label>
+          <Label htmlFor="studentId" className="text-sm font-medium text-gray-700">
+            Student ID <span className="text-xs text-gray-500">(Auto-generated)</span>
+          </Label>
           <Input
             id="studentId"
             name="studentId"
             type="text"
-            placeholder="Enter student ID"
             value={formData.studentId}
-            onChange={handleInputChange}
-            className="h-11 px-4 border-gray-300 focus:border-green-500 focus:ring-green-500"
+            readOnly
+            className="h-11 px-4 border-gray-300 bg-gray-50 text-gray-700 cursor-not-allowed"
             required
           />
         </div>

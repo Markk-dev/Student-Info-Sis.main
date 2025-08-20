@@ -340,6 +340,15 @@ export const adminService = {
       console.error('Update admin error:', error);
       throw error;
     }
+  },
+
+  async deleteAdmin(adminId: string) {
+    try {
+      return await databases.deleteDocument(DATABASE_ID, COLLECTIONS.ADMINS, adminId);
+    } catch (error) {
+      console.error('Delete admin error:', error);
+      throw error;
+    }
   }
 };
 
@@ -447,20 +456,63 @@ export const settingsService = {
   async getSettings() {
     try {
       const settings = await databases.listDocuments(DATABASE_ID, COLLECTIONS.SETTINGS);
-      return settings.documents[0] as unknown as Settings;
+      if (settings.documents.length > 0) {
+        return settings.documents[0] as unknown as Settings;
+      }
+      // Return default settings if none exist
+      return {
+        canteenName: 'University Canteen',
+        operatingHours: { open: '7:00 AM', close: '8:00 PM' },
+        maxDailySpend: 1000,
+        currency: 'PHP',
+        taxRate: 0.12
+      } as Settings;
     } catch (error) {
       console.error('Get settings error:', error);
-      throw error;
+      // Return default settings on error
+      return {
+        canteenName: 'University Canteen',
+        operatingHours: { open: '7:00 AM', close: '8:00 PM' },
+        maxDailySpend: 1000,
+        currency: 'PHP',
+        taxRate: 0.12
+      } as Settings;
     }
   },
 
   async updateSettings(data: Partial<Settings>) {
     try {
       const settings = await this.getSettings();
-      return await databases.updateDocument(DATABASE_ID, COLLECTIONS.SETTINGS, settings.$id!, data);
+      
+      if (settings.$id) {
+        // Update existing settings
+        return await databases.updateDocument(DATABASE_ID, COLLECTIONS.SETTINGS, settings.$id, data);
+      } else {
+        // Create new settings document
+        return await databases.createDocument(DATABASE_ID, COLLECTIONS.SETTINGS, ID.unique(), {
+          canteenName: 'University Canteen',
+          operatingHours: { open: '7:00 AM', close: '8:00 PM' },
+          maxDailySpend: 1000,
+          currency: 'PHP',
+          taxRate: 0.12,
+          ...data
+        });
+      }
     } catch (error) {
       console.error('Update settings error:', error);
       throw error;
+    }
+  },
+
+  async isSystemInMaintenance() {
+    try {
+      const settings = await this.getSettings();
+      // Temporary workaround: use maxDailySpend as maintenance flag
+      // 0 = maintenance mode, > 0 = normal mode
+      return settings?.maxDailySpend === 0;
+    } catch (error) {
+      console.error('Check maintenance status error:', error);
+      return false; // Default to not in maintenance if error
     }
   }
 }; 

@@ -39,8 +39,46 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
   const [scanner, setScanner] = useState<BrowserMultiFormatReader | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
+  
+  const validateStudentId = (value: string): string => {
+    
+    let cleaned = value.replace(/[^\d-]/g, '');
+    
+    
+    const parts = cleaned.split('-');
+    if (parts.length > 2) {
+      cleaned = parts[0] + '-' + parts.slice(1).join('');
+    }
+    
+    
+    if (parts.length >= 1 && parts[0].length > 3) {
+      parts[0] = parts[0].substring(0, 3);
+    }
+    if (parts.length >= 2 && parts[1].length > 3) {
+      parts[1] = parts[1].substring(0, 3);
+    }
+    
+    
+    return parts.join('-');
+  };
+
+  const handleBarcodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const validatedValue = validateStudentId(value);
+    setScannedCode(validatedValue);
+  };
+
+  
+  const isStudentIdValid = (id: string): boolean => {
+    const pattern = /^\d{3}-\d{3}$/;
+    return pattern.test(id);
+  };
+
   const handleScan = async () => {
-    if (!scannedCode) return;
+    if (!scannedCode || !isStudentIdValid(scannedCode)) {
+      toast.error('Please enter a valid student ID in format: 000-000');
+      return;
+    }
     
     try {
       const student = await studentService.getStudentById(scannedCode);
@@ -114,14 +152,14 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
     onAddTransaction(transaction);
     
-    // Reset form
+    
     setScannedCode('');
     setCurrentStudent(null);
     setTransactionAmount('');
     setIsNewStudent(false);
     setNewStudentData({ name: '', course: '', yearLevel: '' });
     
-    // Focus back to scanner input
+    
     inputRef.current?.focus();
   };
 
@@ -135,7 +173,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       setScanner(codeReader);
       
       await codeReader.decodeFromVideoDevice(
-        null, // Use default camera
+        null, 
         videoRef.current!,
         (result, error) => {
           if (result) {
@@ -162,7 +200,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     }
   };
 
-  // Cleanup scanner on unmount
+  
   useEffect(() => {
     return () => {
       if (scanner) {
@@ -190,16 +228,28 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                 ref={inputRef}
                 id="barcode"
                 type="text"
-                placeholder="Scan or enter student ID"
+                placeholder="Enter student ID (e.g., 123-456)"
                 value={scannedCode}
-                onChange={(e) => setScannedCode(e.target.value)}
+                onChange={handleBarcodeChange}
                 onKeyDown={(e) => e.key === 'Enter' && handleScan()}
                 className="font-mono"
+                pattern="[0-9]{3}-[0-9]{3}"
+                title="Please enter student ID in format: 000-000"
               />
-              <Button onClick={handleScan} disabled={!scannedCode}>
+              <Button onClick={handleScan} disabled={!isStudentIdValid(scannedCode)}>
                 Scan
               </Button>
             </div>
+            {scannedCode && !isStudentIdValid(scannedCode) && (
+              <p className="text-sm text-red-500 mt-1">
+                Please enter student ID in format: 000-000 (e.g., 123-456)
+              </p>
+            )}
+            {scannedCode && isStudentIdValid(scannedCode) && (
+              <p className="text-sm text-green-500 mt-1">
+                ✓ Valid format
+              </p>
+            )}
           </div>
 
           {/* Camera Scanner */}
@@ -295,7 +345,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           {isNewStudent ? (
-            // New Student Registration Form
+            
             <div className="space-y-4">
               <Alert>
                 <UserX className="h-4 w-4" />
@@ -341,7 +391,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
               </Button>
             </div>
           ) : (
-            // Transaction Processing Form
+            
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="amount">Transaction Amount (₱)</Label>

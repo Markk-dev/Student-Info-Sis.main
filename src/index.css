@@ -55,5 +55,25 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Geist Sans', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
+  /* Ensure monospace elements use Geist Mono */
+  code, pre, .font-mono {
+    font-family: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+}
+
+@layer utilities {
+  /* Custom font utilities for Geist fonts */
+  .font-geist-sans {
+    font-family: 'Geist Sans', ui-sans-serif, system-ui, sans-serif;
+  }
+  
+  .font-geist-mono {
+    font-family: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
   }
 } 

@@ -1,34 +1,40 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Users, TrendingUp, DollarSign, ShoppingCart, Clock, Award, Settings } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, PhilippinePeso, ShoppingCart, Settings, Target  } from 'lucide-react';
 import { studentService, transactionService, productService } from '@/lib/services';
 import { format, subDays, startOfDay, endOfDay, getHours } from 'date-fns';
 import { toast } from 'sonner';
+import { DottedSeparator } from '../ui/dotted-line';
 
 const COLORS = ['#14a800', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [monthlyTarget, setMonthlyTarget] = useState(() => {
-    // Load from localStorage on component mount
+    
     const saved = localStorage.getItem('monthlyTarget');
-    return saved ? parseFloat(saved) : 50000; // Default to 50000 if no saved value
+    return saved ? parseFloat(saved) : 50000; 
   });
   const [showTargetDialog, setShowTargetDialog] = useState(false);
   const [newTarget, setNewTarget] = useState('');
+  const [isMaintenance, setIsMaintenance] = useState(false);
   const [stats, setStats] = useState({
     totalStudents: 0,
+    activeStudentsToday: 0,
     dailyRevenue: 0,
+    yesterdayRevenue: 0,
     weeklyRevenue: 0,
+    lastWeekRevenue: 0,
     monthlyRevenue: 0,
     totalTransactions: 0,
+    dailyTransactions: 0,
+    yesterdayTransactions: 0,
     averageTransaction: 0
   });
   const [revenueData, setRevenueData] = useState<any[]>([]);
@@ -43,7 +49,7 @@ export function AdminDashboard() {
       return;
     }
     setMonthlyTarget(target);
-    // Save to localStorage for persistence
+    
     localStorage.setItem('monthlyTarget', target.toString());
     setShowTargetDialog(false);
     setNewTarget('');
@@ -55,7 +61,16 @@ export function AdminDashboard() {
       try {
         setLoading(true);
         
-        // Load all data
+        // Check maintenance mode
+        try {
+          const { settingsService } = await import('@/lib/services');
+          const maintenanceStatus = await settingsService.isSystemInMaintenance();
+          setIsMaintenance(maintenanceStatus);
+        } catch (error) {
+          console.error('Error checking maintenance status:', error);
+        }
+        
+        // Load admins/cashiers
         const [studentsResponse, transactionsResponse, productsResponse] = await Promise.all([
           studentService.getStudents(),
           transactionService.getTransactions(),
@@ -66,25 +81,25 @@ export function AdminDashboard() {
         const transactions = transactionsResponse.documents;
         const products = productsResponse.documents;
 
-        // Create a map of student data for quick lookup (same as TransactionsPage)
+        
         const studentsMap = new Map();
         students.forEach((student: any) => {
           studentsMap.set(student.studentId, student);
         });
 
-        // Transform transactions with proper date handling (same as TransactionsPage)
+        
         const transformedTransactions = transactions.map((txn: any) => {
           const student = studentsMap.get(txn.studentId);
           
-          // Validate and create date safely
+          
           let timestamp: Date;
           try {
             timestamp = new Date(txn.createdAt);
             if (isNaN(timestamp.getTime())) {
-              timestamp = new Date(); // Fallback to current date if invalid
+              timestamp = new Date(); 
             }
           } catch (error) {
-            timestamp = new Date(); // Fallback to current date if error
+            timestamp = new Date(); 
           }
           
           return {
@@ -101,13 +116,13 @@ export function AdminDashboard() {
           };
         });
 
-        // Calculate basic stats using transformed data
+        
         const totalStudents = students.length;
         const totalTransactions = transformedTransactions.length;
         const totalRevenue = transformedTransactions.reduce((sum: number, txn: any) => sum + txn.amount, 0);
         const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
-        // Calculate daily revenue (today)
+        
         const today = new Date();
         const todayStart = startOfDay(today);
         const todayEnd = endOfDay(today);
@@ -118,7 +133,32 @@ export function AdminDashboard() {
           })
           .reduce((sum: number, txn: any) => sum + txn.amount, 0);
 
-        // Calculate weekly revenue (last 7 days)
+        
+        const dailyTransactions = transformedTransactions
+          .filter((txn: any) => {
+            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
+            return txn.timestamp >= todayStart && txn.timestamp <= todayEnd;
+          }).length;
+
+        
+        const yesterday = subDays(today, 1);
+        const yesterdayStart = startOfDay(yesterday);
+        const yesterdayEnd = endOfDay(yesterday);
+        const yesterdayRevenue = transformedTransactions
+          .filter((txn: any) => {
+            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
+            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd;
+          })
+          .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+
+        
+        const yesterdayTransactions = transformedTransactions
+          .filter((txn: any) => {
+            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
+            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd;
+          }).length;
+
+        
         const weekAgo = subDays(today, 7);
         const weeklyRevenue = transformedTransactions
           .filter((txn: any) => {
@@ -127,7 +167,17 @@ export function AdminDashboard() {
           })
           .reduce((sum: number, txn: any) => sum + txn.amount, 0);
 
-        // Calculate monthly revenue (this month)
+        
+        const lastWeekStart = subDays(today, 14);
+        const lastWeekEnd = subDays(today, 8);
+        const lastWeekRevenue = transformedTransactions
+          .filter((txn: any) => {
+            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
+            return txn.timestamp >= lastWeekStart && txn.timestamp <= lastWeekEnd;
+          })
+          .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+
+        
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
         const monthlyRevenue = transformedTransactions
           .filter((txn: any) => {
@@ -136,16 +186,24 @@ export function AdminDashboard() {
           })
           .reduce((sum: number, txn: any) => sum + txn.amount, 0);
 
+        
+        const activeStudents = students.filter((student: any) => student.isActive === true).length;
+
         setStats({
           totalStudents,
+          activeStudentsToday: activeStudents,
           dailyRevenue,
+          yesterdayRevenue,
           weeklyRevenue,
+          lastWeekRevenue,
           monthlyRevenue,
           totalTransactions,
+          dailyTransactions,
+          yesterdayTransactions,
           averageTransaction
         });
 
-        // Prepare revenue data (last 7 days)
+        
         const revenueData = [];
         for (let i = 6; i >= 0; i--) {
           const date = subDays(today, i);
@@ -166,7 +224,7 @@ export function AdminDashboard() {
         }
         setRevenueData(revenueData);
 
-        // Prepare course data
+        
         const courseMap = new Map<string, number>();
         transformedTransactions.forEach((txn: any) => {
           const course = txn.course;
@@ -184,7 +242,7 @@ export function AdminDashboard() {
 
         setCourseData(courseData);
 
-        // Prepare real peak hours data
+        
         const hourMap = new Map<number, number>();
         for (let i = 0; i < 24; i++) {
           hourMap.set(i, 0);
@@ -210,7 +268,7 @@ export function AdminDashboard() {
 
         setPeakHoursData(peakHoursData);
 
-        // Prepare recent sales
+        
         const recentSales = transformedTransactions
           .slice(0, 5)
           .map((txn: any) => ({
@@ -247,71 +305,116 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalStudents}</div>
-            <p className="text-xs text-muted-foreground">
-              Registered students
-            </p>
+            <DottedSeparator className="my-3" />
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+              <span>{stats.activeStudentsToday} active students</span>
+              <span>{stats.totalStudents > 0 ? Math.round((stats.activeStudentsToday / stats.totalStudents) * 100) : 0}%</span>
+            </div>
+            <Progress 
+              value={stats.totalStudents > 0 ? (stats.activeStudentsToday / stats.totalStudents) * 100 : 0} 
+              className="h-2"
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <PhilippinePeso className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₱{stats.dailyRevenue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              Daily earnings
-            </p>
+            <DottedSeparator className="my-3" />
+            <div className="space-y-2">
+              <div className={`flex items-center gap-1 text-sm ${
+                stats.dailyRevenue >= stats.yesterdayRevenue ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {stats.dailyRevenue >= stats.yesterdayRevenue ? (
+                  <TrendingUp className="h-4 w-4" />
+                ) : (
+                  <TrendingDown className="h-4 w-4" />
+                )}
+                <span>
+                  {stats.yesterdayRevenue > 0 ? 
+                    `${Math.abs(((stats.dailyRevenue - stats.yesterdayRevenue) / stats.yesterdayRevenue) * 100).toFixed(1)}% from yesterday` :
+                    '0% from yesterday'
+                  }
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">This Week</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <Target className="h-5 w-5 text-muted-foreground text-violet-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₱{stats.weeklyRevenue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              Weekly revenue
-            </p>
+            <DottedSeparator className="my-3" />
+            <div className={`flex items-center gap-2 text-sm ${
+              stats.weeklyRevenue >= stats.lastWeekRevenue ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {stats.weeklyRevenue >= stats.lastWeekRevenue ? (
+                <TrendingUp className="h-4 w-4" />
+              ) : (
+                <TrendingDown className="h-4 w-4" />
+              )}
+              <span>
+                {stats.lastWeekRevenue > 0 ? 
+                  `${Math.abs(((stats.weeklyRevenue - stats.lastWeekRevenue) / stats.lastWeekRevenue) * 100).toFixed(1)}% from last week` :
+                  '0% from last week'
+                }
+              </span>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <ShoppingCart className="h-5 w-5 text-muted-foreground text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalTransactions}</div>
-            <p className="text-xs text-muted-foreground">
-              All time transactions
-            </p>
+            <DottedSeparator className="my-3" />
+            <div className={`flex items-center gap-2 text-sm ${
+              stats.dailyTransactions >= stats.yesterdayTransactions ? 'text-green-600' : 'text-red-600'
+            }`}>
+              {stats.dailyTransactions >= stats.yesterdayTransactions ? (
+                <TrendingUp className="h-4 w-4" />
+              ) : (
+                <TrendingDown className="h-4 w-4" />
+              )}
+              <span>
+                {stats.yesterdayTransactions > 0 ? 
+                  `${Math.abs(((stats.dailyTransactions - stats.yesterdayTransactions) / stats.yesterdayTransactions) * 100).toFixed(1)}% from yesterday` :
+                  '0% from yesterday'
+                }
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Trend */}
         <Card>
-          <CardHeader>
-            <CardTitle>Revenue Trend</CardTitle>
-            <CardDescription>Daily revenue for the past week</CardDescription>
+          <CardHeader className='bg-primary rounded-t-lg mb-4'>
+            <CardTitle className='font-bold text-white'>Revenue Trend</CardTitle>
+            <CardDescription className='text-white'>Daily revenue for the past week</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
+            <ResponsiveContainer width="100%" height={350} className='text-xs'>
               <LineChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -325,30 +428,63 @@ export function AdminDashboard() {
 
         {/* Transactions by Course */}
         <Card>
-          <CardHeader>
-            <CardTitle>Transactions by Course</CardTitle>
-            <CardDescription>Breakdown of transactions by student course</CardDescription>
+          <CardHeader className='bg-primary rounded-t-lg mb-4'>
+            <CardTitle className='font-bold text-white'>Transactions by Course</CardTitle>
+            <CardDescription className='text-white'>Breakdown of transactions by student course</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={courseData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percentage }) => `${name} ${percentage}%`}
-                  outerRadius={120}
-                  fill="#8884d8"
-                  dataKey="purchases"
-                >
-                  {courseData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [value, 'Transactions']} />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="flex items-center justify-center">
+              <div className="relative w-64 h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={courseData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={120}
+                      paddingAngle={5}
+                      dataKey="purchases"
+                    >
+                      {courseData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [value, 'Transactions']} />
+                  </PieChart>
+                </ResponsiveContainer>
+                
+                {/* Center text overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-foreground">
+                      {stats.totalTransactions}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Total Transactions
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Legend */}
+            <div className="mt-6 space-y-2">
+              {courseData.map((entry, index) => (
+                <div key={entry.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <span className="text-sm font-medium">{entry.name}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {entry.purchases} ({entry.percentage}%)
+                  </span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -356,31 +492,83 @@ export function AdminDashboard() {
       {/* Additional Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Peak Hours */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Peak Transaction Hours</CardTitle>
-            <CardDescription>Transaction volume throughout the day</CardDescription>
+        <Card className="py-0">
+          <CardHeader className="flex flex-col border-b items-stretch !p-0 sm:flex-row">
+            <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:!py-0">
+              <CardTitle>Peak Transaction Hours</CardTitle>
+              <CardDescription>Transaction volume throughout the day</CardDescription>
+            </div>
+            <div className="flex">
+              <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left sm:border-t-0 sm:px-8 sm:py-6 bg-muted/50">
+                <span className="text-muted-foreground text-xs">Peak Hour</span>
+                <span className="text-lg leading-none font-bold sm:text-3xl text-primary">
+                {peakHoursData.length > 0 ? 
+                  peakHoursData.find(item => item.transactions === Math.max(...peakHoursData.map(h => h.transactions)))?.time || '' 
+                  : ''
+                }
+                </span>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={peakHoursData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time" />
-                <YAxis />
-                <Tooltip formatter={(value) => [value, 'Transactions']} />
-                <Bar dataKey="transactions" fill="#14a800" />
+          <CardContent className="px-2 sm:p-6">
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart
+                data={peakHoursData}
+                margin={{
+                  left: 12,
+                  right: 12,
+                }}
+              >
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="time"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={32}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                />
+                <Tooltip 
+                  formatter={(value) => [value, 'Transactions']}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Bar 
+                  dataKey="transactions" 
+                  fill="#14a800"
+                  radius={[4, 4, 0, 0]}
+                  className="hover:opacity-80 transition-opacity"
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
         {/* Recent Sales */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Sales</CardTitle>
-            <CardDescription>Latest transactions</CardDescription>
+        <Card className="py-0">
+          <CardHeader className="flex flex-col border-b items-stretch !p-0 sm:flex-row">
+            <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:!py-0">
+              <CardTitle>Recent Sales</CardTitle>
+              <CardDescription>Latest transactions</CardDescription>
+            </div>
+            <div className="flex">
+              <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left sm:border-t-0 sm:px-8 sm:py-6 bg-muted/50">
+                <span className="text-muted-foreground text-xs">Today's Sales</span>
+                <span className="text-lg leading-none font-bold sm:text-3xl text-primary">
+                  {stats.dailyTransactions}
+                </span>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 sm:p-6">
             <div className="space-y-4">
               {recentSales.map((sale) => (
                 <div key={sale.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -483,11 +671,17 @@ export function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-sm font-medium">All Systems Operational</span>
+              {isMaintenance ? (
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              ) : (
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              )}
+              <span className="text-sm font-medium">
+                {isMaintenance ? 'Maintenance Mode Active' : 'All Systems Operational'}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Database, authentication, and services running normally
+              {isMaintenance ? 'Application is in maintenance mode. Some features may be unavailable.' : 'Database, authentication, and services running normally'}
             </p>
           </CardContent>
         </Card>
