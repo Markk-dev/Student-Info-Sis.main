@@ -136,7 +136,16 @@ export function AdminDashboard() {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
             return txn.timestamp >= todayStart && txn.timestamp <= todayEnd && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+          .reduce((sum: number, txn: any) => {
+            // For revenue, use the actual money received (transactionAmount)
+            // For paid transactions, use totalItemAmount
+            // For partial transactions, use transactionAmount (actual money received)
+            if (txn.status === 'Partial') {
+              return sum + (txn.transactionAmount || 0);
+            } else {
+              return sum + (txn.totalItemAmount || 0);
+            }
+          }, 0);
 
         
         const dailyTransactions = transformedTransactions
@@ -154,7 +163,14 @@ export function AdminDashboard() {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
             return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+          .reduce((sum: number, txn: any) => {
+            // For revenue, use the actual money received (transactionAmount)
+            if (txn.status === 'Partial') {
+              return sum + (txn.transactionAmount || 0);
+            } else {
+              return sum + (txn.totalItemAmount || 0);
+            }
+          }, 0);
 
         
         const yesterdayTransactions = transformedTransactions
@@ -170,7 +186,14 @@ export function AdminDashboard() {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
             return txn.timestamp >= weekAgo && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+          .reduce((sum: number, txn: any) => {
+            // For revenue, use the actual money received (transactionAmount)
+            if (txn.status === 'Partial') {
+              return sum + (txn.transactionAmount || 0);
+            } else {
+              return sum + (txn.totalItemAmount || 0);
+            }
+          }, 0);
 
         
         const lastWeekStart = subDays(today, 14);
@@ -180,7 +203,14 @@ export function AdminDashboard() {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
             return txn.timestamp >= lastWeekStart && txn.timestamp <= lastWeekEnd && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+          .reduce((sum: number, txn: any) => {
+            // For revenue, use the actual money received (transactionAmount)
+            if (txn.status === 'Partial') {
+              return sum + (txn.transactionAmount || 0);
+            } else {
+              return sum + (txn.totalItemAmount || 0);
+            }
+          }, 0);
 
         
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -189,7 +219,14 @@ export function AdminDashboard() {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
             return txn.timestamp >= monthStart && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+          .reduce((sum: number, txn: any) => {
+            // For revenue, use the actual money received (transactionAmount)
+            if (txn.status === 'Partial') {
+              return sum + (txn.transactionAmount || 0);
+            } else {
+              return sum + (txn.totalItemAmount || 0);
+            }
+          }, 0);
 
         
         const activeStudents = students.filter((student: any) => student.isActive === true).length;
@@ -220,7 +257,14 @@ export function AdminDashboard() {
               if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
               return txn.timestamp >= dayStart && txn.timestamp <= dayEnd && txn.status !== 'Credit';
             })
-            .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+            .reduce((sum: number, txn: any) => {
+              // For revenue, use the actual money received (transactionAmount)
+              if (txn.status === 'Partial') {
+                return sum + (txn.transactionAmount || 0);
+              } else {
+                return sum + (txn.totalItemAmount || 0);
+              }
+            }, 0);
 
           revenueData.push({
             name: format(date, 'EEE'),

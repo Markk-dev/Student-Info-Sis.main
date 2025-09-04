@@ -68,6 +68,30 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
   // Calculate change (Transaction Amount - Total Item Prices)
   const transactionAmountNum = parseFloat(transactionAmount) || 0;
   const change = transactionAmountNum - totalItemPrices;
+  
+  // Dynamic status button disabling logic
+  const isPaidDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum < totalItemPrices;
+  const isPartialDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum >= totalItemPrices || transactionAmountNum === 0;
+  const isCreditDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum > 0;
+
+  // Auto-select appropriate status based on conditions
+  useEffect(() => {
+    if (!currentStudent?.isRegistered || totalItemPrices === 0) {
+      setTransactionStatus('');
+      return;
+    }
+
+    if (transactionAmountNum === 0) {
+      // No transaction amount = Credit
+      setTransactionStatus('Credit');
+    } else if (transactionAmountNum >= totalItemPrices) {
+      // Sufficient amount = Paid
+      setTransactionStatus('Paid');
+    } else if (transactionAmountNum < totalItemPrices) {
+      // Insufficient amount = Partial
+      setTransactionStatus('Partial');
+    }
+  }, [transactionAmountNum, totalItemPrices, currentStudent?.isRegistered]);
 
   // Add new item price field
   const addItemPrice = () => {
@@ -179,6 +203,15 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       return;
     }
 
+    // Filter out empty item prices and convert to numbers
+    const validItemPrices = itemPrices.filter(price => price.trim() !== '').map(price => parseFloat(price));
+    const totalItemAmount = validItemPrices.reduce((sum, price) => sum + price, 0);
+
+    if (totalItemAmount <= 0) {
+      toast.error('Please enter valid item prices');
+      return;
+    }
+
     // For credit transactions, transaction amount can be 0 or empty
     if (transactionStatus !== 'Credit') {
       if (!transactionAmount) {
@@ -195,14 +228,18 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
     const amount = parseFloat(transactionAmount) || 0;
 
-    // Filter out empty item prices and convert to numbers
-    const validItemPrices = itemPrices.filter(price => price.trim() !== '').map(price => parseFloat(price));
-    const totalItemAmount = validItemPrices.reduce((sum, price) => sum + price, 0);
-
-    // No need for type field since we have status
-
-    // For credit transactions, amount should be negative (debt)
-    const finalAmount = transactionStatus === 'Credit' ? -totalItemAmount : totalItemAmount;
+    // Calculate final amount based on status
+    let finalAmount: number;
+    if (transactionStatus === 'Credit') {
+      // For credit transactions, amount should be negative (debt)
+      finalAmount = -totalItemAmount;
+    } else if (transactionStatus === 'Partial') {
+      // For partial transactions, record the remaining balance (negative)
+      finalAmount = amount - totalItemAmount;
+    } else {
+      // For paid transactions, record the total item amount
+      finalAmount = totalItemAmount;
+    }
 
     const transaction = {
       studentId: currentStudent.id,
@@ -222,6 +259,9 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     // Show appropriate success message
     if (transactionStatus === 'Credit') {
       toast.success(`Credit transaction processed: ₱${totalItemAmount.toFixed(2)} loan recorded`);
+    } else if (transactionStatus === 'Partial') {
+      const remainingBalance = totalItemAmount - amount;
+      toast.success(`Partial transaction processed: ₱${amount.toFixed(2)} paid, ₱${remainingBalance.toFixed(2)} remaining`);
     } else {
       toast.success(`Transaction processed: ₱${totalItemAmount.toFixed(2)}`);
     }
@@ -509,13 +549,23 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
               {/* Transaction Status */}
               <div className="space-y-2">
                 <Label>Transaction Status</Label>
+                {totalItemPrices > 0 && (
+                  <div className="text-xs text-gray-600 mb-2">
+                    {transactionAmountNum === 0 
+                      ? "No payment entered - Credit transaction" 
+                      : transactionAmountNum >= totalItemPrices 
+                        ? "Full payment received - Paid transaction" 
+                        : "Partial payment - Partial transaction"
+                    }
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2">
                   <Button
                     type="button"
                     variant={transactionStatus === 'Paid' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setTransactionStatus('Paid')}
-                    disabled={!currentStudent?.isRegistered}
+                    disabled={isPaidDisabled}
                     className={transactionStatus === 'Paid' ? 'bg-green-500 hover:bg-green-600' : ''}
                   >
                     Paid
@@ -525,7 +575,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     variant={transactionStatus === 'Partial' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setTransactionStatus('Partial')}
-                    disabled={!currentStudent?.isRegistered}
+                    disabled={isPartialDisabled}
                     className={transactionStatus === 'Partial' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
                   >
                     Partial
@@ -535,7 +585,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     variant={transactionStatus === 'Credit' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setTransactionStatus('Credit')}
-                    disabled={!currentStudent?.isRegistered}
+                    disabled={isCreditDisabled}
                     className={transactionStatus === 'Credit' ? 'bg-red-500 hover:bg-red-600' : ''}
                   >
                     Credit
@@ -545,7 +595,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
               <Button
                 onClick={handleProcessTransaction}
-                disabled={!currentStudent?.isRegistered || !transactionStatus || totalItemPrices === 0 || (change < 0 && transactionStatus !== 'Credit') || (transactionStatus !== 'Credit' && !transactionAmount)}
+                disabled={!currentStudent?.isRegistered || !transactionStatus || totalItemPrices === 0 || (change < 0 && transactionStatus !== 'Credit' && transactionStatus !== 'Partial') || (transactionStatus !== 'Credit' && transactionStatus !== 'Partial' && !transactionAmount)}
                 className="w-full"
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />

@@ -391,8 +391,20 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold">₱{transaction.amount.toFixed(2)}</p>
-                  <Badge variant="outline" className="text-xs">
+                  <p className={`font-semibold ${
+                    transaction.status === 'Credit' 
+                      ? 'text-red-600' 
+                      : transaction.status === 'Partial' 
+                        ? 'text-yellow-600' 
+                        : ''
+                  }`}>
+                    ₱{transaction.amount.toFixed(2)}
+                  </p>
+                  <Badge variant="outline" className={`text-xs ${
+                    transaction.status === 'Partial' 
+                      ? 'bg-yellow-200 text-yellow-900 border-yellow-300' 
+                      : ''
+                  }`}>
                     {transaction.status}
                   </Badge>
                 </div>

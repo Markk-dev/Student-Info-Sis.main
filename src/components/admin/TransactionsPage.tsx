@@ -170,7 +170,7 @@ export function TransactionsPage() {
   const getStatusBadge = (status: Transaction['status']) => {
     const config = {
       Paid: { variant: 'default' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 border border-green-200 rounded-full' },
-      Partial: { variant: 'secondary' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-full' },
+      Partial: { variant: 'secondary' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-200 text-yellow-900 border border-yellow-300 rounded-full' },
       Credit: { variant: 'outline' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 rounded-full' },
       completed: { variant: 'default' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 border border-green-200 rounded-full' },
       pending: { variant: 'secondary' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-full' },
@@ -247,13 +247,22 @@ export function TransactionsPage() {
   const handleNewTransaction = async (transactionData: any) => {
     try {
       
-      // For credit transactions, amount should be negative (debt)
-      const isCreditTransaction = transactionData.status === 'Credit';
-      const transactionAmount = isCreditTransaction ? -transactionData.totalItemAmount : transactionData.transactionAmount;
+      // Calculate amount based on transaction status
+      let amount: number;
+      if (transactionData.status === 'Credit') {
+        // For credit transactions, amount should be negative (debt)
+        amount = -transactionData.totalItemAmount;
+      } else if (transactionData.status === 'Partial') {
+        // For partial transactions, record the remaining balance (negative)
+        amount = transactionData.transactionAmount - transactionData.totalItemAmount;
+      } else {
+        // For paid transactions, record the total item amount
+        amount = transactionData.totalItemAmount;
+      }
 
       await transactionService.createTransaction({
         studentId: transactionData.studentId,
-        amount: transactionAmount, // Negative for credit (debt), positive for paid
+        amount: amount, // Calculated based on status
         transactionAmount: transactionData.transactionAmount, // Amount customer handed over
         totalItemAmount: transactionData.totalItemAmount, // Always positive - actual item value
         itemPrices: JSON.stringify(transactionData.itemPrices || []), // Store as JSON string
@@ -503,9 +512,16 @@ export function TransactionsPage() {
               .filter(t => {
                 const today = new Date();
                 const txnDate = t.timestamp && !isNaN(t.timestamp.getTime()) ? new Date(t.timestamp) : null;
-                return txnDate && txnDate.toDateString() === today.toDateString() && (t.status === 'Paid' || t.status === 'completed');
+                return txnDate && txnDate.toDateString() === today.toDateString() && (t.status === 'Paid' || t.status === 'completed' || t.status === 'Partial');
               })
-              .reduce((sum, t) => sum + (t.totalItemAmount || 0), 0)
+              .reduce((sum, t) => {
+                // For revenue, use the actual money received (transactionAmount)
+                if (t.status === 'Partial') {
+                  return sum + (t.transactionAmount || 0);
+                } else {
+                  return sum + (t.totalItemAmount || 0);
+                }
+              }, 0)
               .toFixed(2)}</div>
             <p className="text-xs text-muted-foreground text-white">Item sales revenue</p>
           </CardContent>
@@ -522,9 +538,16 @@ export function TransactionsPage() {
                 const txnDate = t.timestamp && !isNaN(t.timestamp.getTime()) ? new Date(t.timestamp) : null;
                 return txnDate && txnDate.getMonth() === now.getMonth() && 
                        txnDate.getFullYear() === now.getFullYear() && 
-                       (t.status === 'Paid' || t.status === 'completed');
+                       (t.status === 'Paid' || t.status === 'completed' || t.status === 'Partial');
               })
-              .reduce((sum, t) => sum + (t.totalItemAmount || 0), 0)
+              .reduce((sum, t) => {
+                // For revenue, use the actual money received (transactionAmount)
+                if (t.status === 'Partial') {
+                  return sum + (t.transactionAmount || 0);
+                } else {
+                  return sum + (t.totalItemAmount || 0);
+                }
+              }, 0)
               .toFixed(2)}</div>
             <p className="text-xs text-muted-foreground  text-white">Monthly item sales</p>
           </CardContent>
@@ -536,7 +559,14 @@ export function TransactionsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold  text-white">₱{transactions.length > 0 
-              ? (transactions.reduce((sum, t) => sum + (t.totalItemAmount || 0), 0) / transactions.length).toFixed(2)
+              ? (transactions.reduce((sum, t) => {
+                  // For average, use the actual money received (transactionAmount)
+                  if (t.status === 'Partial') {
+                    return sum + (t.transactionAmount || 0);
+                  } else {
+                    return sum + (t.totalItemAmount || 0);
+                  }
+                }, 0) / transactions.length).toFixed(2)
               : '0.00'}</div>
             <p className="text-xs text-muted-foreground  text-white">Average item sales</p>
           </CardContent>
@@ -673,7 +703,13 @@ export function TransactionsPage() {
                     </TableCell>
                     <TableCell>{transaction.course}</TableCell>
                     <TableCell>
-                      <span className={transaction.status === 'Credit' ? 'text-red-600 font-medium' : ''}>
+                      <span className={
+                        transaction.status === 'Credit' 
+                          ? 'text-red-600 font-medium' 
+                          : transaction.status === 'Partial' 
+                            ? 'text-yellow-600 font-medium' 
+                            : ''
+                      }>
                         ₱{transaction.amount.toFixed(2)}
                       </span>
                     </TableCell>
@@ -857,7 +893,13 @@ export function TransactionsPage() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Amount</Label>
-                  <p className={`text-2xl font-bold mt-1 ${selectedTransaction?.status === 'Credit' ? 'text-red-600' : 'text-green-600'}`}>
+                  <p className={`text-2xl font-bold mt-1 ${
+                    selectedTransaction?.status === 'Credit' 
+                      ? 'text-red-600' 
+                      : selectedTransaction?.status === 'Partial' 
+                        ? 'text-yellow-500' 
+                        : 'text-green-600'
+                  }`}>
                     ₱{selectedTransaction?.amount.toFixed(2)}
                   </p>
                 </div>
