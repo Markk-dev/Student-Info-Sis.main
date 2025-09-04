@@ -75,7 +75,6 @@
   "type": "string",
   "items": "string[]",
   "cashierId": "string",
-  "notes": "string",
   "createdAt": "string"
 }
 ```
@@ -103,7 +102,6 @@
   "totalAmount": "number",
   "status": "string",
   "cashierId": "string",
-  "notes": "string",
   "createdAt": "string",
   "updatedAt": "string"
 }

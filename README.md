@@ -102,7 +102,6 @@ A modern React-based management system for university canteens with separate int
   status: 'Paid' | 'Partial' | 'Credit';  // Transaction status
   items?: string[];       // Items purchased
   cashierId: string;      // Cashier/admin ID
-  notes?: string;         // Additional notes
   createdAt: string;      // Transaction timestamp
 }
 ```

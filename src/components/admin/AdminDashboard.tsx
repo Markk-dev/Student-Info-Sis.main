@@ -115,7 +115,6 @@ export function AdminDashboard() {
             timestamp: timestamp,
             cashier: txn.cashierId || 'Admin',
             status: txn.status || 'completed',
-            notes: txn.notes
           };
         });
 

@@ -59,7 +59,6 @@ export interface Transaction {
   status?: 'Paid' | 'Partial' | 'Credit';
   items?: string[];
   cashierId: string;
-  notes?: string;
   createdAt?: string;
 }
 
@@ -83,7 +82,6 @@ export interface Order {
   totalAmount: number;
   status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
   cashierId: string;
-  notes?: string;
   createdAt?: string;
   updatedAt?: string;
 }

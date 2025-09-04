@@ -30,7 +30,6 @@ interface Transaction {
   timestamp: Date;
   cashier: string;
   status: 'Paid' | 'Partial' | 'Credit' | 'completed' | 'pending' | 'refunded';
-  notes?: string;
 }
 
 export function TransactionsPage() {
@@ -46,10 +45,8 @@ export function TransactionsPage() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [editForm, setEditForm] = useState({
-    amount: '',
-    notes: ''
-  });
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
@@ -106,7 +103,6 @@ export function TransactionsPage() {
             timestamp: timestamp,
             cashier: txn.cashierId || 'Admin',
             status: txn.status || 'completed',
-            notes: txn.notes
           };
         });
         
@@ -268,7 +264,6 @@ export function TransactionsPage() {
         itemPrices: JSON.stringify(transactionData.itemPrices || []), // Store as JSON string
         status: transactionData.status, // Paid/Partial/Credit
         cashierId: 'admin_002', 
-        notes: `Transaction processed via barcode scanner`
       });
 
       
@@ -311,7 +306,6 @@ export function TransactionsPage() {
           timestamp: timestamp,
           cashier: txn.cashierId || 'Admin',
           status: txn.status || 'completed',
-          notes: txn.notes
         };
       });
       
@@ -342,40 +336,75 @@ export function TransactionsPage() {
     }
   };
 
-  const handleEditTransaction = async () => {
+
+  const handlePayment = async (paymentType: 'full' | 'partial') => {
     if (!editingTransaction) return;
 
     try {
-      const amount = parseFloat(editForm.amount);
-      if (isNaN(amount) || amount <= 0) {
-        toast.error('Please enter a valid amount');
+      setIsProcessingPayment(true);
+      
+      const payment = parseFloat(paymentAmount);
+      if (isNaN(payment) || payment <= 0) {
+        toast.error('Please enter a valid payment amount');
         return;
       }
 
+      const currentTransactionAmount = editingTransaction.transactionAmount || 0;
+      const totalItemAmount = editingTransaction.totalItemAmount || 0;
+      const currentAmount = editingTransaction.amount; // This is the remaining balance (negative for partial/credit)
+      const remainingBalance = Math.abs(currentAmount);
+
+      // Prevent overpayment
+      if (payment > remainingBalance) {
+        toast.error(`Payment amount cannot exceed outstanding balance of ₱${remainingBalance.toFixed(2)}`);
+        return;
+      }
       
+      let newTransactionAmount: number;
+      let newAmount: number;
+      let newStatus: 'Paid' | 'Partial' | 'Credit';
+
+      if (paymentType === 'full') {
+        // Pay the full remaining balance
+        newTransactionAmount = currentTransactionAmount + remainingBalance;
+        newAmount = totalItemAmount; // Now equals totalItemAmount since fully paid
+        newStatus = 'Paid';
+      } else {
+        // Partial payment
+        if (payment >= remainingBalance) {
+          // Payment covers full balance
+          newTransactionAmount = currentTransactionAmount + remainingBalance;
+          newAmount = totalItemAmount; // Now equals totalItemAmount since fully paid
+          newStatus = 'Paid';
+        } else {
+          // Partial payment - still has remaining balance
+          newTransactionAmount = currentTransactionAmount + payment;
+          newAmount = -(remainingBalance - payment); // Negative amount for remaining balance
+          newStatus = 'Partial';
+        }
+      }
+
+      // Update the transaction
       await transactionService.updateTransaction(editingTransaction.id, {
-        amount: amount,
-        notes: editForm.notes
+        transactionAmount: newTransactionAmount,
+        amount: newAmount,
+        status: newStatus
       });
 
-      
+      // Refresh data
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
-      
       
       const studentsMap = new Map();
       studentsResponse.documents.forEach((student: any) => {
         studentsMap.set(student.studentId, student);
       });
       
-      
       const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
         const student = studentsMap.get(txn.studentId);
         
-        
         let timestamp: Date;
         try {
-          // Appwrite stores timestamps in ISO format, parse directly
           timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
             console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
@@ -392,20 +421,31 @@ export function TransactionsPage() {
           studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
           course: student ? student.course : 'Unknown',
           amount: txn.amount,
+          transactionAmount: txn.transactionAmount,
+          itemPrices: txn.itemPrices,
+          totalItemAmount: txn.totalItemAmount,
           timestamp: timestamp,
           cashier: txn.cashierId || 'Admin',
           status: txn.status || 'completed',
-          notes: txn.notes
         };
       });
       
+      console.log('Refreshed transaction data:', transformedTransactions.find(t => t.id === editingTransaction.id));
+      
       setTransactions(transformedTransactions);
       setEditingTransaction(null);
-      setEditForm({ amount: '', notes: '' });
-      toast.success('Transaction updated successfully');
+      setPaymentAmount('');
+      
+      if (newStatus === 'Paid') {
+        toast.success('Payment completed! Transaction is now fully paid.');
+      } else {
+        toast.success(`Partial payment of ₱${payment.toFixed(2)} processed. Remaining balance: ₱${Math.abs(newAmount).toFixed(2)}`);
+      }
     } catch (error) {
-      console.error('Error updating transaction:', error);
-      toast.error('Failed to update transaction');
+      console.error('Error processing payment:', error);
+      toast.error('Failed to process payment');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -453,7 +493,6 @@ export function TransactionsPage() {
           timestamp: timestamp,
           cashier: txn.cashierId || 'Admin',
           status: txn.status || 'completed',
-          notes: txn.notes
         };
       });
       
@@ -744,10 +783,7 @@ export function TransactionsPage() {
                           size="sm"
                           onClick={() => {
                             setEditingTransaction(transaction);
-                            setEditForm({
-                              amount: transaction.amount.toString(),
-                              notes: transaction.notes || ''
-                            });
+                            setPaymentAmount('');
                           }}
                         >
                           <Edit className="h-4 w-4" />
@@ -852,73 +888,139 @@ export function TransactionsPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6">
-            {/* Transaction Info */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
+          <div className="space-y-8">
+            {/* Transaction Header */}
+            <div className="bg-gray-50 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Transaction Number</Label>
-                  <Input
-                    value={selectedTransaction?.id || ''}
-                    disabled
-                    className="bg-gray-50"
-                  />
+                  <h3 className="text-lg font-semibold text-gray-900">Transaction Information</h3>
+                  <p className="text-sm text-gray-600">Transaction #{selectedTransaction?.id}</p>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Student Name</Label>
-                  <p className="text-lg font-semibold mt-1">{selectedTransaction?.studentName}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Course</Label>
-                  <p className="text-lg mt-1">{selectedTransaction?.course}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Date</Label>
-                  <p className="text-lg mt-1">{selectedTransaction && formatDate(selectedTransaction.timestamp)}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Cashier</Label>
-                  <p className="text-lg mt-1">{selectedTransaction?.cashier}</p>
+                <div className="text-right">
+                  {selectedTransaction && getStatusBadge(selectedTransaction.status)}
                 </div>
               </div>
               
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                  <div className="mt-1">{selectedTransaction && getStatusBadge(selectedTransaction.status)}</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Student</Label>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">{selectedTransaction?.studentName}</p>
+                    <p className="text-sm text-gray-600 font-mono">{selectedTransaction?.studentId}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Course</Label>
+                    <p className="text-base font-medium text-gray-900 mt-1">{selectedTransaction?.course}</p>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Student ID</Label>
-                  <p className="font-mono text-lg font-semibold mt-1">{selectedTransaction?.studentId}</p>
+                
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transaction Amount</Label>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">
+                      ₱{(selectedTransaction?.transactionAmount || 0).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">Amount paid by student</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Item Value</Label>
+                    <p className="text-2xl font-bold text-green-600 mt-1">
+                      ₱{(selectedTransaction?.totalItemAmount || 0).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">Total item cost</p>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Amount</Label>
-                  <p className={`text-2xl font-bold mt-1 ${
-                    selectedTransaction?.status === 'Credit' 
-                      ? 'text-red-600' 
-                      : selectedTransaction?.status === 'Partial' 
-                        ? 'text-yellow-500' 
-                        : 'text-green-600'
-                  }`}>
-                    ₱{selectedTransaction?.amount.toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Time</Label>
-                  <p className="text-lg mt-1">{selectedTransaction && formatTime(selectedTransaction.timestamp)}</p>
+                
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date & Time</Label>
+                    <p className="text-base font-medium text-gray-900 mt-1">
+                      {selectedTransaction && formatDate(selectedTransaction.timestamp)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {selectedTransaction && formatTime(selectedTransaction.timestamp)}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cashier</Label>
+                    <p className="text-base font-medium text-gray-900 mt-1">{selectedTransaction?.cashier}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Notes */}
-            {selectedTransaction?.notes && (
-              <div className="pt-4 border-t">
-                <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
-                <div className="mt-2 p-4 bg-muted/50 rounded-lg border">
-                  <p className="text-base leading-relaxed">{selectedTransaction.notes}</p>
+            {/* Outstanding Balances */}
+            {selectedTransaction && (
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Student Outstanding Balances</h3>
+                  <div className="text-sm text-gray-500">
+                    {(() => {
+                      const studentTransactions = transactions.filter(t => t.studentId === selectedTransaction.studentId);
+                      const outstandingCount = studentTransactions.filter(t => 
+                        t.status === 'Partial' || t.status === 'Credit'
+                      ).length;
+                      return `${outstandingCount} ${outstandingCount === 1 ? 'balance' : 'balances'}`;
+                    })()}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {(() => {
+                    const studentTransactions = transactions.filter(t => t.studentId === selectedTransaction.studentId);
+                    const outstandingTransactions = studentTransactions.filter(t => 
+                      t.status === 'Partial' || t.status === 'Credit'
+                    );
+                    
+                    if (outstandingTransactions.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-medium text-gray-900 mb-2">No Outstanding Balances</h4>
+                          <p className="text-gray-600">This student has no pending payments or loans.</p>
+                        </div>
+                      );
+                    }
+                    
+                    return outstandingTransactions.map((txn) => (
+                      <div key={txn.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                        <div className="flex items-center space-x-4">
+                          <div className={`w-3 h-3 rounded-full ${
+                            txn.status === 'Credit' ? 'bg-red-500' : 'bg-yellow-500'
+                          }`}></div>
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              Transaction #{txn.id.slice(-8)}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {formatDate(txn.timestamp)} • {txn.status}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-xl font-bold ${
+                            txn.status === 'Credit' ? 'text-red-600' : 'text-yellow-600'
+                          }`}>
+                            ₱{txn.status === 'Credit' 
+                              ? (txn.totalItemAmount || 0).toFixed(2)
+                              : Math.abs(txn.amount).toFixed(2)
+                            }
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {txn.status === 'Credit' ? 'Outstanding Loan' : 'Remaining Balance'}
+                          </p>
+                        </div>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
             )}
+
           </div>
         </DialogContent>
       </Dialog>
@@ -939,53 +1041,118 @@ export function TransactionsPage() {
 
       {/* Edit Transaction Modal */}
       <Dialog open={!!editingTransaction} onOpenChange={() => setEditingTransaction(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Edit Transaction</DialogTitle>
+            <DialogTitle>Transaction Payment</DialogTitle>
             <DialogDescription>
-              Update transaction details for {editingTransaction?.studentName}
+              Process payment for {editingTransaction?.studentName}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Transaction Number</Label>
-              <Input
-                value={editingTransaction?.id || ''}
-                disabled
-                className="bg-gray-50"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-amount">Amount (₱)</Label>
-              <Input
-                id="edit-amount"
-                type="number"
-                step="0.01"
-                value={editForm.amount}
-                onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
-                placeholder="0.00"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Input
-                id="edit-notes"
-                value={editForm.notes}
-                onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Add notes about this transaction..."
-              />
+            {/* Transaction Summary - Horizontal Layout */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-gray-900">Transaction Summary</h3>
+                <div className="text-sm text-gray-500 font-mono">
+                  #{editingTransaction?.id}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-6">
+                <div className="text-center">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Amount Paid</Label>
+                  <p className="text-xl font-bold text-blue-600 mt-1">
+                    ₱{(editingTransaction?.transactionAmount || 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Item Value</Label>
+                  <p className="text-xl font-bold text-green-600 mt-1">
+                    ₱{(editingTransaction?.totalItemAmount || 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Outstanding</Label>
+                  <p className="text-xl font-bold text-amber-600 mt-1">
+                    ₱{Math.abs(editingTransaction?.amount || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setEditingTransaction(null)}>
-                Cancel
-              </Button>
-              <Button onClick={handleEditTransaction}>
-                Update Transaction
-              </Button>
-            </div>
+            {/* Payment Section - Compact Layout */}
+            {(editingTransaction?.status === 'Partial' || editingTransaction?.status === 'Credit') && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between gap-6">
+                  {/* Payment Input */}
+                  <div className="flex-1">
+                    <Label htmlFor="payment-amount" className="text-sm font-medium text-gray-700">
+                      Payment Amount (₱)
+                    </Label>
+                    <Input
+                      id="payment-amount"
+                      type="number"
+                      step="0.01"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="mt-1"
+                      max={Math.abs(editingTransaction?.amount || 0)}
+                    />
+                    {paymentAmount && parseFloat(paymentAmount) > Math.abs(editingTransaction?.amount || 0) && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ⚠️ Cannot exceed outstanding balance
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Quick Fill Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setPaymentAmount(Math.abs(editingTransaction?.amount || 0).toString())}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Full
+                    </Button>
+                    <Button
+                      onClick={() => setPaymentAmount((Math.abs(editingTransaction?.amount || 0) / 2).toFixed(2))}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Half
+                    </Button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setEditingTransaction(null)}
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => handlePayment('partial')}
+                      disabled={!paymentAmount || isProcessingPayment || parseFloat(paymentAmount) > Math.abs(editingTransaction?.amount || 0)}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {isProcessingPayment ? (
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Processing...
+                        </div>
+                      ) : (
+                        'Update'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
