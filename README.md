@@ -99,7 +99,7 @@ A modern React-based management system for university canteens with separate int
 {
   studentId: string;      // Student ID
   amount: number;         // Transaction amount
-  type: 'purchase' | 'refund' | 'deposit';  // Transaction type
+  status: 'Paid' | 'Partial' | 'Credit';  // Transaction status
   items?: string[];       // Items purchased
   cashierId: string;      // Cashier/admin ID
   notes?: string;         // Additional notes

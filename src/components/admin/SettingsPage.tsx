@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Download, Upload, Plus, Edit, Trash2, Save, X, UserPlus, Shield, Database, Bell, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, UserPlus, Shield, Database, Bell, Clock, AlertOctagon } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminService, settingsService } from '@/lib/services';
 
@@ -336,17 +335,6 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => exportData('Settings')}>
-          <Download className="h-4 w-4 mr-2" />
-          Export
-        </Button>
-        <Button variant="outline" onClick={importData}>
-          <Upload className="h-4 w-4 mr-2" />
-          Import
-        </Button>
-      </div>
 
       {/* Settings Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -396,32 +384,35 @@ export function SettingsPage() {
               </div>
               
               {maintenanceMode && (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-yellow-800">
-                        <strong>⚠️ Maintenance Mode Active:</strong> Student login and registration are currently disabled. 
-                        The system is temporarily closed for maintenance.
-                      </p>
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg h-full">
+                  <div className="flex flex-col justify-between h-full">
+                    <div className='flex items-center gap-2'>
+                      <AlertOctagon className='text-icon flex flex-col font-bold text-yellow-800'/>
+                      <p className='font-bold'>Maintenance</p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          await settingsService.updateSettings({ maxDailySpend: 1000 });
-                          setMaintenanceMode(false);
-                          setSettings(prev => ({ ...prev, maxDailySpend: 1000 }));
-                          toast.success('Maintenance mode disabled');
-                        } catch (error) {
-                          console.error('Failed to disable maintenance mode:', error);
-                          toast.error('Failed to disable maintenance mode');
-                        }
-                      }}
-                      className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
-                    >
-                      Disable Maintenance
-                    </Button>
+
+                    <div className='flex justify-between items-center'>
+                       <p className='text-xs'>The system is temporarily closed for maintenance.</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            await settingsService.updateSettings({ maxDailySpend: 1000 });
+                            setMaintenanceMode(false);
+                            setSettings(prev => ({ ...prev, maxDailySpend: 1000 }));
+                            toast.success('Maintenance mode disabled');
+                          } catch (error) {
+                            console.error('Failed to disable maintenance mode:', error);
+                            toast.error('Failed to disable maintenance mode');
+                          }
+                        }}
+                        className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+                      >
+                        Active
+                      </Button>
+                    </div>
+
                   </div>
                 </div>
               )}

@@ -42,7 +42,7 @@ export function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Check if system is in maintenance mode
+      
       const { settingsService } = await import('@/lib/services');
       const isMaintenance = await settingsService.isSystemInMaintenance();
       
@@ -53,7 +53,7 @@ export function RegisterPage() {
       }
     } catch (error) {
       console.error('Error checking maintenance status:', error);
-      // Continue with registration if we can't check maintenance status
+      
     }
 
     

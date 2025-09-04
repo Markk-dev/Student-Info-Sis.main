@@ -170,14 +170,14 @@ export function LoginPage() {
             {isLoading ? 'Logging in...' : 'Login as Student'}
           </Button>
 
-          <div className="text-center pt-4">
+          {/* <div className="text-center pt-4">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
               <a href="/register" className="text-green-600 hover:text-green-700 font-medium">
                 Register here
               </a>
             </p>
-          </div>
+          </div> */}
         </form>
       )}
     </AuthLayout>

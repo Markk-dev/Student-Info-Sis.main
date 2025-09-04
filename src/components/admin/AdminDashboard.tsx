@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Users, TrendingUp, TrendingDown, PhilippinePeso, ShoppingCart, Settings, Target  } from 'lucide-react';
-import { studentService, transactionService, productService } from '@/lib/services';
+import { Users, TrendingUp, TrendingDown, PhilippinePeso, ShoppingCart, Settings, Target, RefreshCw  } from 'lucide-react';
+import { studentService, transactionService } from '@/lib/services';
 import { format, subDays, startOfDay, endOfDay, getHours } from 'date-fns';
 import { toast } from 'sonner';
 import { DottedSeparator } from '../ui/dotted-line';
@@ -56,8 +56,7 @@ export function AdminDashboard() {
     toast.success(`Monthly target set to ₱${target.toFixed(2)}`);
   };
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
+  const loadDashboardData = async () => {
       try {
         setLoading(true);
         
@@ -71,15 +70,14 @@ export function AdminDashboard() {
         }
         
         // Load admins/cashiers
-        const [studentsResponse, transactionsResponse, productsResponse] = await Promise.all([
+        const [studentsResponse, transactionsResponse] = await Promise.all([
           studentService.getStudents(),
-          transactionService.getTransactions(),
-          productService.getProducts()
+          transactionService.getTransactions()
         ]);
 
         const students = studentsResponse.documents;
         const transactions = transactionsResponse.documents;
-        const products = productsResponse.documents;
+        // const products = productsResponse.documents;
 
         
         const studentsMap = new Map();
@@ -94,11 +92,14 @@ export function AdminDashboard() {
           
           let timestamp: Date;
           try {
-            timestamp = new Date(txn.createdAt);
+            // Appwrite stores timestamps in ISO format, parse directly
+            timestamp = new Date(txn.$createdAt || txn.createdAt);
             if (isNaN(timestamp.getTime())) {
+              console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
               timestamp = new Date(); 
             }
           } catch (error) {
+            console.warn('Error parsing timestamp for transaction:', txn.$id, error);
             timestamp = new Date(); 
           }
           
@@ -108,10 +109,12 @@ export function AdminDashboard() {
             studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
             course: student ? student.course : 'Unknown',
             amount: txn.amount,
+            transactionAmount: txn.transactionAmount,
+            itemPrices: txn.itemPrices,
+            totalItemAmount: txn.totalItemAmount,
             timestamp: timestamp,
             cashier: txn.cashierId || 'Admin',
-            status: txn.type === 'refund' ? 'refunded' : 'completed',
-            type: txn.type,
+            status: txn.status || 'completed',
             notes: txn.notes
           };
         });
@@ -119,7 +122,9 @@ export function AdminDashboard() {
         
         const totalStudents = students.length;
         const totalTransactions = transformedTransactions.length;
-        const totalRevenue = transformedTransactions.reduce((sum: number, txn: any) => sum + txn.amount, 0);
+        const totalRevenue = transformedTransactions
+          .filter((txn: any) => txn.status !== 'Credit')
+          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
         const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
         
@@ -129,15 +134,15 @@ export function AdminDashboard() {
         const dailyRevenue = transformedTransactions
           .filter((txn: any) => {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= todayStart && txn.timestamp <= todayEnd;
+            return txn.timestamp >= todayStart && txn.timestamp <= todayEnd && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
 
         
         const dailyTransactions = transformedTransactions
           .filter((txn: any) => {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= todayStart && txn.timestamp <= todayEnd;
+            return txn.timestamp >= todayStart && txn.timestamp <= todayEnd && txn.status !== 'Credit';
           }).length;
 
         
@@ -147,15 +152,15 @@ export function AdminDashboard() {
         const yesterdayRevenue = transformedTransactions
           .filter((txn: any) => {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd;
+            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
 
         
         const yesterdayTransactions = transformedTransactions
           .filter((txn: any) => {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd;
+            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd && txn.status !== 'Credit';
           }).length;
 
         
@@ -163,9 +168,9 @@ export function AdminDashboard() {
         const weeklyRevenue = transformedTransactions
           .filter((txn: any) => {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= weekAgo;
+            return txn.timestamp >= weekAgo && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
 
         
         const lastWeekStart = subDays(today, 14);
@@ -173,18 +178,18 @@ export function AdminDashboard() {
         const lastWeekRevenue = transformedTransactions
           .filter((txn: any) => {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= lastWeekStart && txn.timestamp <= lastWeekEnd;
+            return txn.timestamp >= lastWeekStart && txn.timestamp <= lastWeekEnd && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
 
         
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
         const monthlyRevenue = transformedTransactions
           .filter((txn: any) => {
             if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= monthStart;
+            return txn.timestamp >= monthStart && txn.status !== 'Credit';
           })
-          .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
 
         
         const activeStudents = students.filter((student: any) => student.isActive === true).length;
@@ -213,9 +218,9 @@ export function AdminDashboard() {
           const dayRevenue = transformedTransactions
             .filter((txn: any) => {
               if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-              return txn.timestamp >= dayStart && txn.timestamp <= dayEnd;
+              return txn.timestamp >= dayStart && txn.timestamp <= dayEnd && txn.status !== 'Credit';
             })
-            .reduce((sum: number, txn: any) => sum + txn.amount, 0);
+            .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
 
           revenueData.push({
             name: format(date, 'EEE'),
@@ -269,8 +274,16 @@ export function AdminDashboard() {
         setPeakHoursData(peakHoursData);
 
         
-        const recentSales = transformedTransactions
-          .slice(0, 5)
+        // Sort transactions by timestamp (newest first), then by ID as fallback
+        const sortedTransactions = transformedTransactions.sort((a, b) => {
+          const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+          if (timeDiff !== 0) return timeDiff;
+          // If timestamps are the same, sort by ID (newer IDs come first)
+          return b.id.localeCompare(a.id);
+        });
+        
+        const recentSales = sortedTransactions
+          .slice(0, 4)
           .map((txn: any) => ({
             id: txn.id,
             studentId: txn.studentId,
@@ -289,7 +302,29 @@ export function AdminDashboard() {
       }
     };
 
+  useEffect(() => {
     loadDashboardData();
+  }, []);
+
+  // Refresh dashboard when window regains focus (e.g., when returning from transaction page)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadDashboardData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  // Listen for new transaction events and refresh dashboard
+  useEffect(() => {
+    const handleTransactionCreated = () => {
+      console.log('TransactionCreated event received, refreshing dashboard...');
+      loadDashboardData();
+    };
+
+    window.addEventListener('transactionCreated', handleTransactionCreated);
+    return () => window.removeEventListener('transactionCreated', handleTransactionCreated);
   }, []);
 
   if (loading) {
@@ -305,6 +340,23 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Dashboard Header with Refresh Button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Overview of your student information system</p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => loadDashboardData()}
+          disabled={loading}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -446,7 +498,7 @@ export function AdminDashboard() {
                       paddingAngle={5}
                       dataKey="purchases"
                     >
-                      {courseData.map((entry, index) => (
+                      {courseData.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>

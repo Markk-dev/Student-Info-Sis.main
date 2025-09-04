@@ -52,8 +52,11 @@ export interface Admin {
 export interface Transaction {
   $id?: string;
   studentId: string;
-  amount: number;
-  type: 'purchase' | 'refund' | 'deposit';
+  amount: number; // This will be totalItemAmount (what was bought)
+  transactionAmount?: number; // Amount customer handed over
+  itemPrices?: number[]; // Individual item prices
+  totalItemAmount?: number; // Sum of item prices
+  status?: 'Paid' | 'Partial' | 'Credit';
   items?: string[];
   cashierId: string;
   notes?: string;

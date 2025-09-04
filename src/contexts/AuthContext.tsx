@@ -19,9 +19,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false); // Start with false since we don't check sessions
+  const [loading, setLoading] = useState(false); 
 
-  // Check for stored user data in localStorage on app start
+  
   useEffect(() => {
     const storedUser = localStorage.getItem('canteen_user');
     if (storedUser) {
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (userType: 'admin' | 'student', userData: Admin | Student) => {
     const userInfo = { type: userType, data: userData };
     setUser(userInfo);
-    // Store user data in localStorage for persistence
+    
     localStorage.setItem('canteen_user', JSON.stringify(userInfo));
   };
 
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
-      // Remove stored user data
+      
       localStorage.removeItem('canteen_user');
     }
   };

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Download, Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
@@ -14,17 +14,22 @@ import { toast } from 'sonner';
 import { transactionService, studentService } from '@/lib/services';
 import { format as formatDateFns } from 'date-fns';
 import { BarcodeScanner } from './BarcodeScanner';
+import { DottedSeparator } from '../ui/dotted-line';
+
+// const COLORS = ['#14a800', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 interface Transaction {
   id: string;
   studentId: string;
   studentName: string;
   course: string;
-  amount: number;
+  amount: number; // This will now be the item prices total
+  transactionAmount?: number; // Amount customer handed over
+  itemPrices?: string; // Individual item prices stored as JSON string
+  totalItemAmount?: number; // Total of item prices
   timestamp: Date;
   cashier: string;
-  status: 'completed' | 'pending' | 'refunded';
-  type: string;
+  status: 'Paid' | 'Partial' | 'Credit' | 'completed' | 'pending' | 'refunded';
   notes?: string;
 }
 
@@ -43,12 +48,13 @@ export function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editForm, setEditForm] = useState({
     amount: '',
-    notes: '',
-    type: 'purchase'
+    notes: ''
   });
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
 
-  // Load transactions from database
+  
   useEffect(() => {
     const loadTransactions = async () => {
       try {
@@ -57,25 +63,35 @@ export function TransactionsPage() {
         
         const studentsResponse = await studentService.getStudents();
         
-        // Create a map of student data for quick lookup
+        
         const studentsMap = new Map();
         studentsResponse.documents.forEach((student: any) => {
           studentsMap.set(student.studentId, student);
         });
         
-        // Transform Appwrite data to our interface
+        
         const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
           const student = studentsMap.get(txn.studentId);
           
-          // Validate and create date safely
+          
           let timestamp: Date;
           try {
-            timestamp = new Date(txn.createdAt);
+            // Appwrite stores timestamps in ISO format, parse directly
+            timestamp = new Date(txn.$createdAt || txn.createdAt);
             if (isNaN(timestamp.getTime())) {
-              timestamp = new Date(); // Fallback to current date if invalid
+              console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
+              timestamp = new Date(); 
+            } else {
+              // Debug log for successful timestamp parsing
+              console.log(`Successfully parsed timestamp for ${txn.$id}:`, {
+                raw: txn.$createdAt || txn.createdAt,
+                parsed: timestamp.toISOString(),
+                local: timestamp.toString()
+              });
             }
           } catch (error) {
-            timestamp = new Date(); // Fallback to current date if error
+            console.warn('Error parsing timestamp for transaction:', txn.$id, error);
+            timestamp = new Date(); 
           }
           
           return {
@@ -84,15 +100,25 @@ export function TransactionsPage() {
             studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
             course: student ? student.course : 'Unknown',
             amount: txn.amount,
+            transactionAmount: txn.transactionAmount,
+            itemPrices: txn.itemPrices,
+            totalItemAmount: txn.totalItemAmount,
             timestamp: timestamp,
             cashier: txn.cashierId || 'Admin',
-            status: txn.type === 'refund' ? 'refunded' : 'completed',
-            type: txn.type,
+            status: txn.status || 'completed',
             notes: txn.notes
           };
         });
         
-        setTransactions(transformedTransactions);
+        // Sort by latest first (newest transactions at the top), then by ID as fallback
+        const sortedTransactions = transformedTransactions.sort((a, b) => {
+          const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+          if (timeDiff !== 0) return timeDiff;
+          // If timestamps are the same, sort by ID (newer IDs come first)
+          return b.id.localeCompare(a.id);
+        });
+        
+        setTransactions(sortedTransactions);
       } catch (error) {
         toast.error('Failed to load transactions');
       } finally {
@@ -103,13 +129,13 @@ export function TransactionsPage() {
     loadTransactions();
   }, []);
 
-  // Get unique values for filters
+  
   const courses = useMemo(() => {
     const uniqueCourses = [...new Set(transactions.map(t => t.course))];
     return uniqueCourses.sort();
   }, [transactions]);
 
-  // Filter transactions
+  
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
       const matchesSearch = 
@@ -130,14 +156,28 @@ export function TransactionsPage() {
     });
   }, [transactions, searchTerm, courseFilter, statusFilter, dateRange]);
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, courseFilter, statusFilter, dateRange]);
+
   const getStatusBadge = (status: Transaction['status']) => {
     const config = {
+      Paid: { variant: 'default' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 border border-green-200 rounded-full' },
+      Partial: { variant: 'secondary' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-full' },
+      Credit: { variant: 'outline' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 rounded-full' },
       completed: { variant: 'default' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 border border-green-200 rounded-full' },
       pending: { variant: 'secondary' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-full' },
       refunded: { variant: 'destructive' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-red-100 text-red-800 border border-red-200 rounded-full' }
     };
 
-    const { variant, className } = config[status];
+    const { variant, className } = config[status] || config.completed;
 
     return (
       <Badge variant={variant} className={className}>
@@ -150,6 +190,7 @@ export function TransactionsPage() {
     if (!date || isNaN(date.getTime())) {
       return 'Invalid Date';
     }
+    // Use the date directly - formatDateFns handles timezone conversion
     return formatDateFns(date, 'MMM dd, yyyy');
   };
 
@@ -157,12 +198,25 @@ export function TransactionsPage() {
     if (!date || isNaN(date.getTime())) {
       return 'Invalid Time';
     }
+    // Use the date directly - formatDateFns handles timezone conversion
     return formatDateFns(date, 'HH:mm');
   };
 
+  // Debug function to log timestamp information (uncomment for debugging)
+  // const debugTimestamp = (date: Date, transactionId: string) => {
+  //   console.log(`Transaction ${transactionId}:`, {
+  //     originalDate: date,
+  //     isoString: date.toISOString(),
+  //     localString: date.toString(),
+  //     timezoneOffset: date.getTimezoneOffset(),
+  //     formattedDate: formatDate(date),
+  //     formattedTime: formatTime(date)
+  //   });
+  // };
+
   const exportCSV = () => {
-    // Create CSV content
-    const headers = ['Transaction Number', 'Student ID', 'Student Name', 'Course', 'Amount', 'Date', 'Time', 'Cashier', 'Status', 'Type'];
+    
+    const headers = ['Transaction Number', 'Student ID', 'Student Name', 'Course', 'Amount', 'Date', 'Time', 'Cashier', 'Status'];
     const csvContent = [
       headers.join(','),
       ...filteredTransactions.map(t => [
@@ -174,17 +228,16 @@ export function TransactionsPage() {
         formatDate(t.timestamp),
         formatTime(t.timestamp),
         `"${t.cashier}"`,
-        t.status,
-        t.type
+        t.status
       ].join(','))
     ].join('\n');
 
-    // Download CSV file
+    
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `transactions_${formatDateFns(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.download = `transactions_${formatDateFns(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
     
@@ -193,38 +246,48 @@ export function TransactionsPage() {
 
   const handleNewTransaction = async (transactionData: any) => {
     try {
-      // Create transaction in database
-      const newTransaction = await transactionService.createTransaction({
+      
+      // For credit transactions, amount should be negative (debt)
+      const isCreditTransaction = transactionData.status === 'Credit';
+      const transactionAmount = isCreditTransaction ? -transactionData.totalItemAmount : transactionData.transactionAmount;
+
+      await transactionService.createTransaction({
         studentId: transactionData.studentId,
-        amount: transactionData.amount,
-        type: 'purchase',
-        cashierId: 'admin_002', // Current admin ID
+        amount: transactionAmount, // Negative for credit (debt), positive for paid
+        transactionAmount: transactionData.transactionAmount, // Amount customer handed over
+        totalItemAmount: transactionData.totalItemAmount, // Always positive - actual item value
+        itemPrices: JSON.stringify(transactionData.itemPrices || []), // Store as JSON string
+        status: transactionData.status, // Paid/Partial/Credit
+        cashierId: 'admin_002', 
         notes: `Transaction processed via barcode scanner`
       });
 
-      // Reload transactions to get updated data
+      
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
       
-      // Create a map of student data for quick lookup
+      
       const studentsMap = new Map();
       studentsResponse.documents.forEach((student: any) => {
         studentsMap.set(student.studentId, student);
       });
       
-      // Transform Appwrite data to our interface
+      
       const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
         const student = studentsMap.get(txn.studentId);
         
-        // Validate and create date safely
+        
         let timestamp: Date;
         try {
-          timestamp = new Date(txn.createdAt);
+          // Appwrite stores timestamps in ISO format, parse directly
+          timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
-            timestamp = new Date(); // Fallback to current date if invalid
+            console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
+            timestamp = new Date(); 
           }
         } catch (error) {
-          timestamp = new Date(); // Fallback to current date if error
+          console.warn('Error parsing timestamp for transaction:', txn.$id, error);
+          timestamp = new Date(); 
         }
         
         return {
@@ -233,17 +296,37 @@ export function TransactionsPage() {
           studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
           course: student ? student.course : 'Unknown',
           amount: txn.amount,
+          transactionAmount: txn.transactionAmount,
+          itemPrices: txn.itemPrices,
+          totalItemAmount: txn.totalItemAmount,
           timestamp: timestamp,
           cashier: txn.cashierId || 'Admin',
-          status: txn.type === 'refund' ? 'refunded' : 'completed',
-          type: txn.type,
+          status: txn.status || 'completed',
           notes: txn.notes
         };
       });
       
-      setTransactions(transformedTransactions);
+      // Sort by latest first (newest transactions at the top), then by ID as fallback
+      const sortedTransactions = transformedTransactions.sort((a, b) => {
+        const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+        if (timeDiff !== 0) return timeDiff;
+        // If timestamps are the same, sort by ID (newer IDs come first)
+        return b.id.localeCompare(a.id);
+      });
+      
+      setTransactions(sortedTransactions);
       setShowBarcodeScanner(false);
-      toast.success(`Transaction processed: ₱${transactionData.amount.toFixed(2)}`);
+      
+      // Show appropriate success message
+      if (transactionData.status === 'Credit') {
+        toast.success(`Credit transaction processed: ₱${transactionData.amount.toFixed(2)} Credit recorded`);
+      } else {
+        toast.success(`Transaction processed: ₱${transactionData.amount.toFixed(2)}`);
+      }
+      
+      // Dispatch event to notify dashboard of new transaction
+      console.log('Dispatching transactionCreated event');
+      window.dispatchEvent(new CustomEvent('transactionCreated'));
     } catch (error) {
       console.error('Error creating transaction:', error);
       toast.error('Failed to process transaction');
@@ -260,36 +343,38 @@ export function TransactionsPage() {
         return;
       }
 
-      // Update transaction in database
+      
       await transactionService.updateTransaction(editingTransaction.id, {
         amount: amount,
-        type: editForm.type as 'purchase' | 'refund' | 'deposit',
         notes: editForm.notes
       });
 
-      // Reload transactions
+      
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
       
-      // Create a map of student data for quick lookup
+      
       const studentsMap = new Map();
       studentsResponse.documents.forEach((student: any) => {
         studentsMap.set(student.studentId, student);
       });
       
-      // Transform Appwrite data to our interface
+      
       const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
         const student = studentsMap.get(txn.studentId);
         
-        // Validate and create date safely
+        
         let timestamp: Date;
         try {
-          timestamp = new Date(txn.createdAt);
+          // Appwrite stores timestamps in ISO format, parse directly
+          timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
-            timestamp = new Date(); // Fallback to current date if invalid
+            console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
+            timestamp = new Date(); 
           }
         } catch (error) {
-          timestamp = new Date(); // Fallback to current date if error
+          console.warn('Error parsing timestamp for transaction:', txn.$id, error);
+          timestamp = new Date(); 
         }
         
         return {
@@ -300,15 +385,14 @@ export function TransactionsPage() {
           amount: txn.amount,
           timestamp: timestamp,
           cashier: txn.cashierId || 'Admin',
-          status: txn.type === 'refund' ? 'refunded' : 'completed',
-          type: txn.type,
+          status: txn.status || 'completed',
           notes: txn.notes
         };
       });
       
       setTransactions(transformedTransactions);
       setEditingTransaction(null);
-      setEditForm({ amount: '', notes: '', type: 'purchase' });
+      setEditForm({ amount: '', notes: '' });
       toast.success('Transaction updated successfully');
     } catch (error) {
       console.error('Error updating transaction:', error);
@@ -320,32 +404,35 @@ export function TransactionsPage() {
     if (!deletingTransaction) return;
 
     try {
-      // Delete transaction from database
+      
       await transactionService.deleteTransaction(deletingTransaction.id);
 
-      // Reload transactions
+      
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
       
-      // Create a map of student data for quick lookup
+      
       const studentsMap = new Map();
       studentsResponse.documents.forEach((student: any) => {
         studentsMap.set(student.studentId, student);
       });
       
-      // Transform Appwrite data to our interface
+      
       const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
         const student = studentsMap.get(txn.studentId);
         
-        // Validate and create date safely
+        
         let timestamp: Date;
         try {
-          timestamp = new Date(txn.createdAt);
+          // Appwrite stores timestamps in ISO format, parse directly
+          timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
-            timestamp = new Date(); // Fallback to current date if invalid
+            console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
+            timestamp = new Date(); 
           }
         } catch (error) {
-          timestamp = new Date(); // Fallback to current date if error
+          console.warn('Error parsing timestamp for transaction:', txn.$id, error);
+          timestamp = new Date(); 
         }
         
         return {
@@ -356,8 +443,7 @@ export function TransactionsPage() {
           amount: txn.amount,
           timestamp: timestamp,
           cashier: txn.cashierId || 'Admin',
-          status: txn.type === 'refund' ? 'refunded' : 'completed',
-          type: txn.type,
+          status: txn.status || 'completed',
           notes: txn.notes
         };
       });
@@ -392,67 +478,67 @@ export function TransactionsPage() {
         </Button>
         <Button onClick={() => setShowBarcodeScanner(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          + New Transaction
+           New Transaction
         </Button>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Transactions</CardTitle>
+            <CardTitle className="text-sm text-white">Total Transactions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{transactions.length}</div>
-            <p className="text-xs text-muted-foreground">All time</p>
+            <div className="text-2xl font-bold text-white">{transactions.length}</div>
+            <p className="text-xs text-muted-foreground text-white">All time</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Today's Revenue</CardTitle>
+            <CardTitle className="text-sm text-white">Today's Revenue</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">₱{transactions
+            <div className="text-2xl font-bold text-white">₱{transactions
               .filter(t => {
                 const today = new Date();
                 const txnDate = t.timestamp && !isNaN(t.timestamp.getTime()) ? new Date(t.timestamp) : null;
-                return txnDate && txnDate.toDateString() === today.toDateString() && t.status === 'completed';
+                return txnDate && txnDate.toDateString() === today.toDateString() && (t.status === 'Paid' || t.status === 'completed');
               })
-              .reduce((sum, t) => sum + t.amount, 0)
+              .reduce((sum, t) => sum + (t.totalItemAmount || 0), 0)
               .toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Completed transactions</p>
+            <p className="text-xs text-muted-foreground text-white">Item sales revenue</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">This Month</CardTitle>
+            <CardTitle className="text-sm text-white">This Month</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">₱{transactions
+            <div className="text-2xl font-bold text-white">₱{transactions
               .filter(t => {
                 const now = new Date();
                 const txnDate = t.timestamp && !isNaN(t.timestamp.getTime()) ? new Date(t.timestamp) : null;
                 return txnDate && txnDate.getMonth() === now.getMonth() && 
                        txnDate.getFullYear() === now.getFullYear() && 
-                       t.status === 'completed';
+                       (t.status === 'Paid' || t.status === 'completed');
               })
-              .reduce((sum, t) => sum + t.amount, 0)
+              .reduce((sum, t) => sum + (t.totalItemAmount || 0), 0)
               .toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Monthly revenue</p>
+            <p className="text-xs text-muted-foreground  text-white">Monthly item sales</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Average Transaction</CardTitle>
+            <CardTitle className="text-sm text-white">Average Transaction</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">₱{transactions.length > 0 
-              ? (transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length).toFixed(2)
+            <div className="text-2xl font-bold  text-white">₱{transactions.length > 0 
+              ? (transactions.reduce((sum, t) => sum + (t.totalItemAmount || 0), 0) / transactions.length).toFixed(2)
               : '0.00'}</div>
-            <p className="text-xs text-muted-foreground">Per transaction</p>
+            <p className="text-xs text-muted-foreground  text-white">Average item sales</p>
           </CardContent>
         </Card>
       </div>
@@ -504,9 +590,9 @@ export function TransactionsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="refunded">Refunded</SelectItem>
+                  <SelectItem value="Paid">Paid</SelectItem>
+                  <SelectItem value="Partial">Partial</SelectItem>
+                  <SelectItem value="Credit">Credit</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -552,11 +638,12 @@ export function TransactionsPage() {
 
       {/* Transactions Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className='flex flex-col gap-2'>
           <CardTitle>Transaction History</CardTitle>
           <CardDescription>
-            Showing {filteredTransactions.length} of {transactions.length} transactions
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredTransactions.length)} of {filteredTransactions.length} transactions (Page {currentPage} of {totalPages})
           </CardDescription>
+          <DottedSeparator/>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -567,6 +654,7 @@ export function TransactionsPage() {
                   <TableHead>Student</TableHead>
                   <TableHead>Course</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>Item Price</TableHead>
                   <TableHead>Date & Time</TableHead>
                   <TableHead>Cashier</TableHead>
                   <TableHead>Status</TableHead>
@@ -574,7 +662,7 @@ export function TransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransactions.map((transaction, index) => (
+                {paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell className="font-mono">{transaction.id}</TableCell>
                     <TableCell>
@@ -584,11 +672,24 @@ export function TransactionsPage() {
                       </div>
                     </TableCell>
                     <TableCell>{transaction.course}</TableCell>
-                    <TableCell>₱{transaction.amount.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <span className={transaction.status === 'Credit' ? 'text-red-600 font-medium' : ''}>
+                        ₱{transaction.amount.toFixed(2)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {transaction.totalItemAmount ? (
+                        <span className="font-medium">₱{transaction.totalItemAmount.toFixed(2)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div>
-                        <p>{formatDate(transaction.timestamp)}</p>
-                        <p className="text-sm text-muted-foreground">{formatTime(transaction.timestamp)}</p>
+                        <p className="font-medium">{formatDate(transaction.timestamp)}</p>
+                        <p className="text-sm text-muted-foreground font-mono">
+                          {transaction.timestamp.toISOString().split('T')[1].split('.')[0]}
+                        </p>
                       </div>
                     </TableCell>
                     <TableCell>{transaction.cashier}</TableCell>
@@ -609,8 +710,7 @@ export function TransactionsPage() {
                             setEditingTransaction(transaction);
                             setEditForm({
                               amount: transaction.amount.toString(),
-                              notes: transaction.notes || '',
-                              type: transaction.type
+                              notes: transaction.notes || ''
                             });
                           }}
                         >
@@ -631,6 +731,78 @@ export function TransactionsPage() {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                
+                {/* Page Numbers */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  Last
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -685,15 +857,13 @@ export function TransactionsPage() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Amount</Label>
-                  <p className="text-2xl font-bold text-green-600 mt-1">₱{selectedTransaction?.amount.toFixed(2)}</p>
+                  <p className={`text-2xl font-bold mt-1 ${selectedTransaction?.status === 'Credit' ? 'text-red-600' : 'text-green-600'}`}>
+                    ₱{selectedTransaction?.amount.toFixed(2)}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Time</Label>
                   <p className="text-lg mt-1">{selectedTransaction && formatTime(selectedTransaction.timestamp)}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Type</Label>
-                  <p className="text-lg capitalize mt-1">{selectedTransaction?.type}</p>
                 </div>
               </div>
             </div>
@@ -744,31 +914,16 @@ export function TransactionsPage() {
                 className="bg-gray-50"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-amount">Amount (₱)</Label>
-                <Input
-                  id="edit-amount"
-                  type="number"
-                  step="0.01"
-                  value={editForm.amount}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-type">Transaction Type</Label>
-                <Select value={editForm.type} onValueChange={(value) => setEditForm(prev => ({ ...prev, type: value }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="purchase">Purchase</SelectItem>
-                    <SelectItem value="refund">Refund</SelectItem>
-                    <SelectItem value="deposit">Deposit</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label htmlFor="edit-amount">Amount (₱)</Label>
+              <Input
+                id="edit-amount"
+                type="number"
+                step="0.01"
+                value={editForm.amount}
+                onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
+                placeholder="0.00"
+              />
             </div>
             
             <div>

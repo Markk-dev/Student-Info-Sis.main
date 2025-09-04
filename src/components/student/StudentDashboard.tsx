@@ -1,12 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { TrendingUp, PhilippinePeso, ShoppingCart, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { transactionService } from '@/lib/services';
-import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format } from 'date-fns';
+import { DottedSeparator } from '../ui/dotted-line';
 
 interface Transaction {
   id: string;
@@ -14,7 +13,7 @@ interface Transaction {
   timestamp: Date;
   items?: string[];
   cashier: string;
-  type: string;
+  status: string;
 }
 
 interface StudentData {
@@ -35,7 +34,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('thisMonth');
   const [isMaintenance, setIsMaintenance] = useState(false);
 
-  // Check maintenance mode
+  
   useEffect(() => {
     const checkMaintenance = async () => {
       try {
@@ -50,26 +49,26 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
     checkMaintenance();
   }, []);
 
-  // Load student transactions from database
+  
   useEffect(() => {
     const loadTransactions = async () => {
       try {
         setLoading(true);
         const response = await transactionService.getTransactions();
         
-        // Filter transactions for this student
+        
         const studentTransactions = response.documents
           .filter((txn: any) => txn.studentId === studentData.id)
           .map((txn: any) => {
-            // Validate and create date safely
+            
             let timestamp: Date;
             try {
               timestamp = new Date(txn.createdAt);
               if (isNaN(timestamp.getTime())) {
-                timestamp = new Date(); // Fallback to current date if invalid
+                timestamp = new Date(); 
               }
             } catch (error) {
-              timestamp = new Date(); // Fallback to current date if error
+              timestamp = new Date(); 
             }
             
             return {
@@ -78,7 +77,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
               timestamp: timestamp,
               items: txn.items || [],
               cashier: txn.cashierId || 'Admin',
-              type: txn.type
+              status: txn.status || 'Unknown'
             };
           });
         
@@ -93,7 +92,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
     loadTransactions();
   }, [studentData.id]);
 
-  // Helper functions for date formatting
+  
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
@@ -135,53 +134,53 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
     return date >= start && date <= end;
   };
 
-  // Calculate statistics
+  
   const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
   const totalTransactions = transactions.length;
   const averageTransaction = totalTransactions > 0 ? totalSpent / totalTransactions : 0;
 
-  // Filter transactions by selected period
-  const filteredTransactions = useMemo(() => {
-    const now = new Date();
-    let startDate: Date;
-    let endDate: Date;
+  
+  // const filteredTransactions = useMemo(() => {
+  //   const now = new Date();
+  //   let startDate: Date;
+  //   let endDate: Date;
 
-    switch (selectedPeriod) {
-      case 'thisMonth':
-        startDate = getStartOfMonth(now);
-        endDate = getEndOfMonth(now);
-        break;
-      case 'lastMonth':
-        const lastMonth = subtractMonths(now, 1);
-        startDate = getStartOfMonth(lastMonth);
-        endDate = getEndOfMonth(lastMonth);
-        break;
-      case 'thisWeek':
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startDate = startOfWeek;
-        endDate = now;
-        break;
-      default:
-        startDate = new Date(0);
-        endDate = now;
-    }
+  //   switch (selectedPeriod) {
+  //     case 'thisMonth':
+  //       startDate = getStartOfMonth(now);
+  //       endDate = getEndOfMonth(now);
+  //       break;
+  //     case 'lastMonth':
+  //       const lastMonth = subtractMonths(now, 1);
+  //       startDate = getStartOfMonth(lastMonth);
+  //       endDate = getEndOfMonth(lastMonth);
+  //       break;
+  //     case 'thisWeek':
+  //       const startOfWeek = new Date(now);
+  //       startOfWeek.setDate(now.getDate() - now.getDay());
+  //       startDate = startOfWeek;
+  //       endDate = now;
+  //       break;
+  //     default:
+  //       startDate = new Date(0);
+  //       endDate = now;
+  //   }
 
-    return transactions.filter(t => {
-      // Validate timestamp before date comparison
-      if (!t.timestamp || isNaN(t.timestamp.getTime())) {
-        return false; // Skip invalid dates
-      }
-      return isWithinRange(t.timestamp, startDate, endDate);
-    });
-  }, [transactions, selectedPeriod]);
+  //   return transactions.filter(t => {
+      
+  //     if (!t.timestamp || isNaN(t.timestamp.getTime())) {
+  //       return false; 
+  //     }
+  //     return isWithinRange(t.timestamp, startDate, endDate);
+  //   });
+  // }, [transactions, selectedPeriod]);
 
-  // Prepare chart data
+  
   const chartData = useMemo(() => {
     const monthlyData = new Map<string, number>();
     
     transactions.forEach(t => {
-      // Validate timestamp before using date-fns
+      
       if (t.timestamp && !isNaN(t.timestamp.getTime())) {
         const monthKey = format(t.timestamp, 'MMM yyyy');
         monthlyData.set(monthKey, (monthlyData.get(monthKey) || 0) + t.amount);
@@ -198,7 +197,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
     const categories = new Map<string, number>();
     
     transactions.forEach(t => {
-      const category = t.type || 'Other';
+      const category = t.status || 'Other';
       categories.set(category, (categories.get(category) || 0) + t.amount);
     });
 
@@ -256,55 +255,56 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
+        <Card className='bg-green-500'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-white">Total Spent</CardTitle>
+            <PhilippinePeso className="h-4 w-4 text-muted-foreground text-white"/>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₱{totalSpent.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-white">₱{totalSpent.toFixed(2)}</div>
+            <DottedSeparator className='my-2'/>
+            <p className="text-xs text-muted-foreground text-white">
               All time spending
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-green-500'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-white">Total Transactions</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground text-white"/>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalTransactions}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-white">{totalTransactions}</div>
+            <p className="text-xs text-muted-foreground text-white">
               Number of purchases
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-green-500'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Transaction</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-white">Average Transaction</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground text-white" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₱{averageTransaction.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-white">₱{averageTransaction.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground text-white">
               Per transaction
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-green-400'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Last Transaction</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-white">Last Transaction</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground text-white" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-white">
               {transactions.length > 0 ? formatDate(transactions[0].timestamp) : 'Never'}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground text-white">
               Most recent purchase
             </p>
           </CardContent>
@@ -336,7 +336,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         <Card>
           <CardHeader>
             <CardTitle>Spending by Category</CardTitle>
-            <CardDescription>Breakdown of spending by transaction type</CardDescription>
+            <CardDescription>Breakdown of spending by transaction status</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -393,7 +393,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
                 <div className="text-right">
                   <p className="font-semibold">₱{transaction.amount.toFixed(2)}</p>
                   <Badge variant="outline" className="text-xs">
-                    {transaction.type}
+                    {transaction.status}
                   </Badge>
                 </div>
               </div>

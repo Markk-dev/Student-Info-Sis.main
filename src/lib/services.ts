@@ -190,7 +190,8 @@ export const studentService = {
         const student = students.documents[0] as unknown as Student;
         return {
           id: student.studentId,
-          name: `${student.firstName} ${student.lastName}`,
+          firstName: student.firstName,
+          lastName: student.lastName,
           course: student.course,
           yearLevel: student.yearLevel,
           isRegistered: true
@@ -211,6 +212,17 @@ export const studentService = {
     isRegistered: boolean;
   }) {
     try {
+      // Check if student ID already exists
+      const existingStudentId = await databases.listDocuments(
+        DATABASE_ID,
+        COLLECTIONS.STUDENTS,
+        [Query.equal('studentId', data.id)]
+      );
+
+      if (existingStudentId.documents.length > 0) {
+        throw new Error('A student with this Student ID already exists');
+      }
+
       const [firstName, ...lastNameParts] = data.name.split(' ');
       const lastName = lastNameParts.join(' ') || 'Unknown';
       
@@ -218,7 +230,7 @@ export const studentService = {
         studentId: data.id,
         firstName: firstName,
         lastName: lastName,
-        email: `${data.id}@student.university.edu`,
+        email: `${data.id}@quickregister.local`, // Use a placeholder email for quick registration
         password: 'default123', // Default password
         course: data.course,
         yearLevel: data.yearLevel,
@@ -235,7 +247,8 @@ export const studentService = {
 
       return {
         id: createdStudent.studentId,
-        name: data.name,
+        firstName: firstName,
+        lastName: lastName,
         course: data.course,
         yearLevel: data.yearLevel,
         isRegistered: true
@@ -363,7 +376,7 @@ export const transactionService = {
     }
   },
 
-  async createTransaction(data: Omit<Transaction, '$id' | 'createdAt'>) {
+  async createTransaction(data: any) {
     try {
       return await databases.createDocument(DATABASE_ID, COLLECTIONS.TRANSACTIONS, ID.unique(), data);
     } catch (error) {

@@ -6,14 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, UserPlus, AlertTriangle, CheckCircle, XCircle, Flag, Eye } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Flag, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { studentService, transactionService } from '@/lib/services';
-import type { Student as AppwriteStudent } from '@/lib/appwrite';
 import { format } from 'date-fns';
+import { DottedSeparator } from '../ui/dotted-line';
 
 interface Student {
   id: string;
@@ -45,30 +45,30 @@ export function StudentsPage() {
   const [suspensionPeriod, setSuspensionPeriod] = useState('1day');
   const [customDays, setCustomDays] = useState('');
 
-  // Load students from database
+  
   useEffect(() => {
     const loadStudents = async () => {
       try {
         setLoading(true);
         
-        // Check and update suspension status first
+        
         await studentService.checkSuspensionStatus();
         
         const studentsResponse = await studentService.getStudents();
         const transactionsResponse = await transactionService.getTransactions();
         
-        // Transform Appwrite data to our interface
+        
         const transformedStudents: Student[] = studentsResponse.documents.map((student: any) => {
           const studentTransactions = transactionsResponse.documents.filter(
             (txn: any) => txn.studentId === student.studentId
           );
           
           const totalSpent = studentTransactions.reduce((sum: number, txn: any) => {
-            return sum + (txn.type === 'purchase' ? txn.amount : 0);
+            return sum + (txn.status === 'Paid' ? txn.amount : 0);
           }, 0);
           
           const unpaidAmount = studentTransactions.reduce((sum: number, txn: any) => {
-            return sum + (txn.type === 'refund' ? txn.amount : 0);
+            return sum + (txn.status === 'Credit' ? Math.abs(txn.amount) : 0);
           }, 0);
           
           const lastTransaction = studentTransactions.length > 0 
@@ -86,20 +86,20 @@ export function StudentsPage() {
               })()
             : undefined;
           
-          // Determine status based on isActive field first, then activity
+          
           let status: 'active' | 'flagged' | 'suspended' | 'inactive' = 'active';
           
           if (!student.isActive) {
             status = 'suspended';
           } else {
-            // Only check transaction activity if the student is marked as active
+            
             if (lastTransaction) {
               const daysSinceLastTransaction = Math.floor((Date.now() - lastTransaction.getTime()) / (1000 * 60 * 60 * 24));
               if (daysSinceLastTransaction > 3) {
                 status = 'inactive';
               }
             } else {
-              // No transactions at all - but still active if isActive is true
+              
               status = 'active';
             }
           }
@@ -121,7 +121,7 @@ export function StudentsPage() {
             totalSpent,
             status,
             lastTransaction,
-            issues: [], // We'll need to add an issues field to the database schema
+            issues: [], 
             unpaidAmount,
             email: student.email,
             suspensionDate: student.suspensionDate ? (() => {
@@ -147,7 +147,7 @@ export function StudentsPage() {
     loadStudents();
   }, []);
 
-  // Get unique values for filters
+  
   const courses = useMemo(() => {
     const uniqueCourses = [...new Set(students.map(s => s.course))];
     return uniqueCourses.sort();
@@ -158,7 +158,7 @@ export function StudentsPage() {
     return uniqueYears.sort();
   }, [students]);
 
-  // Filter students
+  
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
       const matchesSearch = 
@@ -193,7 +193,7 @@ export function StudentsPage() {
         toast.error('Failed to update student status');
       }
     } else {
-      // For flag and other actions that need the modal
+      
       setSelectedStudent(student);
       setActionType(action);
     }
@@ -206,8 +206,8 @@ export function StudentsPage() {
     }
 
     try {
-      // For now, we'll just show a success message
-      // In the future, we can add an issues field to the database schema
+      
+      
       toast.success('Action recorded successfully');
       setSelectedStudent(null);
       setActionType(null);
@@ -270,54 +270,55 @@ export function StudentsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Students</CardTitle>
+            <CardTitle className="text-sm  text-white">Total Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{students.length}</div>
-            <p className="text-xs text-muted-foreground">Registered in system</p>
+            <div className="text-2xl font-bold text-white">{students.length}</div>
+            <p className="text-xs text-muted-foreground text-white font-bold">Registered in system</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Active Students</CardTitle>
+            <CardTitle className="text-sm text-white">Active Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{students.filter(s => s.status === 'active').length}</div>
-            <p className="text-xs text-muted-foreground">Currently active</p>
+            <div className="text-2xl text-white font-bold">{students.filter(s => s.status === 'active').length}</div>
+            <p className="text-xs text-muted-foreground text-white">Currently active</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Flagged Students</CardTitle>
+            <CardTitle className="text-sm text-white">Flagged Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{students.filter(s => s.status === 'flagged').length}</div>
-            <p className="text-xs text-muted-foreground">Require attention</p>
+            <div className="text-2xl font-bold text-white">{students.filter(s => s.status === 'flagged').length}</div>
+            <p className="text-xs text-muted-foreground text-white">Require attention</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className='bg-primary'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Unpaid Amount</CardTitle>
+            <CardTitle className="text-sm text-white">Unpaid Amount</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">₱{students.reduce((sum, s) => sum + s.unpaidAmount, 0).toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Total outstanding</p>
+            <div className="text-2xl text-white">₱{students.reduce((sum, s) => sum + s.unpaidAmount, 0).toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground text-white">Total outstanding</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardHeader>
+        <CardHeader className='flex flex-col gap-2'>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" />
             Search & Filter
           </CardTitle>
+          <DottedSeparator/>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -325,6 +326,7 @@ export function StudentsPage() {
               <Label htmlFor="search">Search Students</Label>
               <Input
                 id="search"
+                className='text-xs'
                 placeholder="Search by name or ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -338,9 +340,9 @@ export function StudentsPage() {
                   <SelectValue placeholder="All courses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Courses</SelectItem>
+                  <SelectItem value="all" className='text-xs'>All Courses</SelectItem>
                   {courses.map(course => (
-                    <SelectItem key={course} value={course}>{course}</SelectItem>
+                    <SelectItem key={course} className='text-xs' value={course}>{course}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -350,29 +352,29 @@ export function StudentsPage() {
               <Label>Year Level</Label>
               <Select value={yearFilter} onValueChange={setYearFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All years" />
+                  <SelectValue className='text-xs' placeholder="All years" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Years</SelectItem>
                   {yearLevels.map(year => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                    <SelectItem key={year} className='text-xs' value={year}>{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 ">
               <Label>Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
+                  <SelectValue className='text-xs' placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="flagged">Flagged</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem className='text-xs ' value="all">All Statuses</SelectItem>
+                  <SelectItem className='text-xs' value="active">Active</SelectItem>
+                  <SelectItem className='text-xs' value="flagged">Flagged</SelectItem>
+                  <SelectItem className='text-xs' value="suspended">Suspended</SelectItem>
+                  <SelectItem className='text-xs' value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -382,12 +384,14 @@ export function StudentsPage() {
 
       {/* Students Table */}
       <Card>
-        <CardHeader>
+        <CardHeader className='flex flex-col gap-2'>
           <CardTitle>Student List</CardTitle>
           <CardDescription>
             Showing {filteredStudents.length} of {students.length} students
           </CardDescription>
+          <DottedSeparator/>
         </CardHeader>
+   
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
@@ -433,7 +437,7 @@ export function StudentsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => {
                             setSelectedStudent(student);
-                            setActionType(null); // Clear any action type to show details
+                            setActionType(null); 
                           }}>
                             <Eye className="h-4 w-4 mr-2" />
                             View Details

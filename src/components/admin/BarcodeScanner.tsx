@@ -6,14 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { QrCode, UserCheck, UserX, Plus, Minus, ShoppingCart, Camera, CameraOff } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { UserCheck, UserX, ShoppingCart, Search, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { studentService } from '@/lib/services';
-import { BrowserMultiFormatReader } from '@zxing/library';
 
 interface Student {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   course: string;
   yearLevel: string;
   isRegistered: boolean;
@@ -23,75 +24,109 @@ interface BarcodeScannerProps {
   onAddTransaction: (transaction: any) => void;
 }
 
+// Predefined arrays for courses and year levels - easily modifiable
+const COURSES = [
+  'BSIT', 'BSCS', 'BSIS', 'BSEMC', 'BSCE', 'BSEE', 'BSME', 'BSIE', 'BSA', 'BSBA',
+  'BSHM', 'BSTM', 'BSN', 'BSMT', 'BSRT', 'BSPHARMA', 'BSPHARM',
+  'AB', 'AB PSYCH', 'AB POLSCI', 'AB ENG', 'AB HIST', 'AB COMM',
+  'BEED', 'BSED', 'BSE', 'BSED MATH', 'BSED SCI', 'BSED ENG',
+  'BS CRIM', 'BS CIVIL ENG', 'BS IND ENG', 'EDUC', 'BSPT'
+];
+
+const YEAR_LEVELS = [
+  '1st Year', '2nd Year', '3rd Year', '4th Year'
+];
+
 export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
-  const [scannedCode, setScannedCode] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [isNewStudent, setIsNewStudent] = useState(false);
   const [transactionAmount, setTransactionAmount] = useState('');
+  const [itemPrices, setItemPrices] = useState<string[]>(['']);
+  const [transactionStatus, setTransactionStatus] = useState('');
   const [newStudentData, setNewStudentData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     course: '',
     yearLevel: ''
   });
-  const [quickAmounts] = useState([25, 50, 75, 100, 125, 150]);
+  const [courseSearch, setCourseSearch] = useState('');
+  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [scanner, setScanner] = useState<BrowserMultiFormatReader | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
 
-  
-  const validateStudentId = (value: string): string => {
-    
-    let cleaned = value.replace(/[^\d-]/g, '');
-    
-    
-    const parts = cleaned.split('-');
-    if (parts.length > 2) {
-      cleaned = parts[0] + '-' + parts.slice(1).join('');
-    }
-    
-    
-    if (parts.length >= 1 && parts[0].length > 3) {
-      parts[0] = parts[0].substring(0, 3);
-    }
-    if (parts.length >= 2 && parts[1].length > 3) {
-      parts[1] = parts[1].substring(0, 3);
-    }
-    
-    
-    return parts.join('-');
+  // Filtered courses based on search
+  const filteredCourses = COURSES.filter(course =>
+    course.toLowerCase().includes(courseSearch.toLowerCase())
+  );
+
+  // Calculate total from item prices
+  const totalItemPrices = itemPrices.reduce((sum, price) => {
+    const numPrice = parseFloat(price) || 0;
+    return sum + numPrice;
+  }, 0);
+
+  // Calculate change (Transaction Amount - Total Item Prices)
+  const transactionAmountNum = parseFloat(transactionAmount) || 0;
+  const change = transactionAmountNum - totalItemPrices;
+
+  // Add new item price field
+  const addItemPrice = () => {
+    setItemPrices(prev => [...prev, '']);
   };
 
-  const handleBarcodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const validatedValue = validateStudentId(value);
-    setScannedCode(validatedValue);
+  // Update specific item price
+  const updateItemPrice = (index: number, value: string) => {
+    setItemPrices(prev => prev.map((price, i) => i === index ? value : price));
   };
 
-  
-  const isStudentIdValid = (id: string): boolean => {
-    const pattern = /^\d{3}-\d{3}$/;
-    return pattern.test(id);
+  // Remove item price
+  const removeItemPrice = (index: number) => {
+    if (itemPrices.length > 1) {
+      setItemPrices(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (isCourseDropdownOpen && !target.closest('.course-dropdown-container')) {
+        setIsCourseDropdownOpen(false);
+      }
+    };
+
+    if (isCourseDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCourseDropdownOpen]);
+
+  const handleStudentIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setStudentId(e.target.value);
   };
 
   const handleScan = async () => {
-    if (!scannedCode || !isStudentIdValid(scannedCode)) {
-      toast.error('Please enter a valid student ID in format: 000-000');
+    if (!studentId.trim()) {
+      toast.error('Please enter a student ID');
       return;
     }
     
     try {
-      const student = await studentService.getStudentById(scannedCode);
+      const student = await studentService.getStudentById(studentId.trim());
       
       if (student) {
         setCurrentStudent(student);
         setIsNewStudent(false);
-        toast.success(`Student found: ${student.name}`);
+        toast.success(`Student found: ${student.firstName} ${student.lastName}`);
       } else {
         // Student not registered yet
         setCurrentStudent({
-          id: scannedCode,
-          name: '',
+          id: studentId.trim(),
+          firstName: '',
+          lastName: '',
           course: '',
           yearLevel: '',
           isRegistered: false
@@ -100,21 +135,21 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         toast.warning('Student not registered. Please register them first.');
       }
     } catch (error) {
-      toast.error('Error scanning student ID.');
+      toast.error('Error finding student.');
       console.error(error);
     }
   };
 
   const handleRegisterStudent = async () => {
-    if (!newStudentData.name || !newStudentData.course || !newStudentData.yearLevel) {
+    if (!newStudentData.firstName || !newStudentData.lastName || !newStudentData.course || !newStudentData.yearLevel) {
       toast.error('Please fill in all student information');
       return;
     }
 
     try {
       const registeredStudent = await studentService.createStudent({
-        id: scannedCode,
-        name: newStudentData.name,
+        id: studentId.trim(),
+        name: `${newStudentData.firstName} ${newStudentData.lastName}`,
         course: newStudentData.course,
         yearLevel: newStudentData.yearLevel,
         isRegistered: true
@@ -123,166 +158,111 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       setCurrentStudent(registeredStudent);
       setIsNewStudent(false);
       toast.success('Student registered successfully!');
-    } catch (error) {
-      toast.error('Error registering student.');
-      console.error(error);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      if (error.message) {
+        toast.error(`Error registering student: ${error.message}`);
+      } else {
+        toast.error('Error registering student.');
+      }
     }
   };
 
   const handleProcessTransaction = async () => {
-    if (!currentStudent || !transactionAmount) {
-      toast.error('Please scan a student ID and enter transaction amount');
+    if (!currentStudent) {
+      toast.error('Please enter a student ID');
       return;
     }
 
-    const amount = parseFloat(transactionAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid amount');
+    if (!transactionStatus) {
+      toast.error('Please select a transaction status');
       return;
     }
+
+    // For credit transactions, transaction amount can be 0 or empty
+    if (transactionStatus !== 'Credit') {
+      if (!transactionAmount) {
+        toast.error('Please enter a transaction amount');
+        return;
+      }
+      
+      const amount = parseFloat(transactionAmount);
+      if (isNaN(amount) || amount <= 0) {
+        toast.error('Please enter a valid amount');
+        return;
+      }
+    }
+
+    const amount = parseFloat(transactionAmount) || 0;
+
+    // Filter out empty item prices and convert to numbers
+    const validItemPrices = itemPrices.filter(price => price.trim() !== '').map(price => parseFloat(price));
+    const totalItemAmount = validItemPrices.reduce((sum, price) => sum + price, 0);
+
+    // No need for type field since we have status
+
+    // For credit transactions, amount should be negative (debt)
+    const finalAmount = transactionStatus === 'Credit' ? -totalItemAmount : totalItemAmount;
 
     const transaction = {
       studentId: currentStudent.id,
-      studentName: currentStudent.name,
+      studentName: `${currentStudent.firstName} ${currentStudent.lastName}`,
       course: currentStudent.course,
-      amount: amount,
+      amount: finalAmount, // Negative for credit (debt), positive for paid
+      transactionAmount: amount, // Keep the amount customer handed over
+      itemPrices: validItemPrices,
+      totalItemAmount: totalItemAmount, // Always positive - actual item value
+      status: transactionStatus,
       timestamp: new Date(),
       cashier: 'Current User'
     };
 
     onAddTransaction(transaction);
     
+    // Show appropriate success message
+    if (transactionStatus === 'Credit') {
+      toast.success(`Credit transaction processed: ₱${totalItemAmount.toFixed(2)} loan recorded`);
+    } else {
+      toast.success(`Transaction processed: ₱${totalItemAmount.toFixed(2)}`);
+    }
     
-    setScannedCode('');
+    setStudentId('');
     setCurrentStudent(null);
     setTransactionAmount('');
+    setItemPrices(['']);
+    setTransactionStatus('');
     setIsNewStudent(false);
-    setNewStudentData({ name: '', course: '', yearLevel: '' });
+    setNewStudentData({ firstName: '', lastName: '', course: '', yearLevel: '' });
     
     
     inputRef.current?.focus();
   };
 
-  const handleQuickAmount = (amount: number) => {
-    setTransactionAmount(amount.toString());
-  };
-
-  const startCameraScan = async () => {
-    try {
-      const codeReader = new BrowserMultiFormatReader();
-      setScanner(codeReader);
-      
-      await codeReader.decodeFromVideoDevice(
-        null, 
-        videoRef.current!,
-        (result, error) => {
-          if (result) {
-            setScannedCode(result.getText());
-            setIsScanning(false);
-            codeReader.reset();
-            handleScan();
-            toast.success('Barcode scanned successfully!');
-          }
-        }
-      );
-      
-      setIsScanning(true);
-    } catch (error) {
-      console.error('Error starting camera scan:', error);
-      toast.error('Failed to start camera scanner');
-    }
-  };
-
-  const stopCameraScan = () => {
-    if (scanner) {
-      scanner.reset();
-      setIsScanning(false);
-    }
-  };
-
-  
-  useEffect(() => {
-    return () => {
-      if (scanner) {
-        scanner.reset();
-      }
-    };
-  }, [scanner]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Scanner Section */}
+      {/* Student ID Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5" />
-            Barcode Scanner
-          </CardTitle>
-          <CardDescription>Scan student ID barcode to begin transaction</CardDescription>
+          <CardTitle>Student ID</CardTitle>
+          <CardDescription>Enter student ID to begin transaction</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="barcode">Student ID Barcode</Label>
+            <Label htmlFor="student-id">Student ID</Label>
             <div className="flex gap-2">
               <Input
                 ref={inputRef}
-                id="barcode"
+                id="student-id"
                 type="text"
-                placeholder="Enter student ID (e.g., 123-456)"
-                value={scannedCode}
-                onChange={handleBarcodeChange}
+                placeholder="Enter student ID"
+                value={studentId}
+                onChange={handleStudentIdChange}
                 onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-                className="font-mono"
-                pattern="[0-9]{3}-[0-9]{3}"
-                title="Please enter student ID in format: 000-000"
               />
-              <Button onClick={handleScan} disabled={!isStudentIdValid(scannedCode)}>
-                Scan
+              <Button onClick={handleScan} disabled={!studentId.trim()}>
+                Find Student
               </Button>
-            </div>
-            {scannedCode && !isStudentIdValid(scannedCode) && (
-              <p className="text-sm text-red-500 mt-1">
-                Please enter student ID in format: 000-000 (e.g., 123-456)
-              </p>
-            )}
-            {scannedCode && isStudentIdValid(scannedCode) && (
-              <p className="text-sm text-green-500 mt-1">
-                ✓ Valid format
-              </p>
-            )}
-          </div>
-
-          {/* Camera Scanner */}
-          <div className="space-y-2">
-            <Label>Camera Scanner</Label>
-            <div className="space-y-2">
-              {!isScanning ? (
-                <Button 
-                  onClick={startCameraScan} 
-                  variant="outline" 
-                  className="w-full"
-                >
-                  <Camera className="h-4 w-4 mr-2" />
-                  Start Camera Scanner
-                </Button>
-              ) : (
-                <div className="space-y-2">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-48 bg-gray-100 rounded-lg"
-                    autoPlay
-                    playsInline
-                  />
-                  <Button 
-                    onClick={stopCameraScan} 
-                    variant="outline" 
-                    className="w-full"
-                  >
-                    <CameraOff className="h-4 w-4 mr-2" />
-                    Stop Camera Scanner
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
 
@@ -313,7 +293,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Name</p>
-                    <p>{currentStudent.name || 'Not set'}</p>
+                    <p>{currentStudent.firstName && currentStudent.lastName ? `${currentStudent.firstName} ${currentStudent.lastName}` : 'Not set'}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Course</p>
@@ -332,17 +312,14 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
       {/* Transaction/Registration Section */}
       <Card>
-        <CardHeader>
-          <CardTitle>
-            {isNewStudent ? 'Register New Student' : 'Process Transaction'}
-          </CardTitle>
-          <CardDescription>
-            {isNewStudent 
-              ? 'Enter student information to register them in the system'
-              : 'Enter transaction amount and process payment'
-            }
-          </CardDescription>
-        </CardHeader>
+        {isNewStudent && (
+          <CardHeader>
+            <CardTitle>Register New Student</CardTitle>
+            <CardDescription>
+              Enter student information to register them in the system
+            </CardDescription>
+          </CardHeader>
+        )}
         <CardContent className="space-y-4">
           {isNewStudent ? (
             
@@ -355,34 +332,91 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
               </Alert>
               
               <div className="space-y-3">
-                <div>
-                  <Label htmlFor="student-name">Full Name</Label>
-                  <Input
-                    id="student-name"
-                    placeholder="Enter student's full name"
-                    value={newStudentData.name}
-                    onChange={(e) => setNewStudentData(prev => ({ ...prev, name: e.target.value }))}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="student-firstName">First Name</Label>
+                    <Input
+                      id="student-firstName"
+                      placeholder="Enter first name"
+                      value={newStudentData.firstName}
+                      onChange={(e) => setNewStudentData(prev => ({ ...prev, firstName: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="student-lastName">Last Name</Label>
+                    <Input
+                      id="student-lastName"
+                      placeholder="Enter last name"
+                      value={newStudentData.lastName}
+                      onChange={(e) => setNewStudentData(prev => ({ ...prev, lastName: e.target.value }))}
+                    />
+                  </div>
                 </div>
                 
                 <div>
                   <Label htmlFor="student-course">Course</Label>
-                  <Input
-                    id="student-course"
-                    placeholder="e.g., Computer Science"
-                    value={newStudentData.course}
-                    onChange={(e) => setNewStudentData(prev => ({ ...prev, course: e.target.value }))}
-                  />
+                  <div className="relative course-dropdown-container">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Search and select a course..."
+                        value={newStudentData.course || courseSearch}
+                        onChange={(e) => {
+                          setCourseSearch(e.target.value);
+                          // Clear selection when user starts typing
+                          if (e.target.value !== newStudentData.course) {
+                            setNewStudentData(prev => ({ ...prev, course: '' }));
+                          }
+                        }}
+                        onFocus={() => setIsCourseDropdownOpen(true)}
+                        className={`pl-8 ${newStudentData.course ? 'bg-green-50 border-green-300' : ''}`}
+                      />
+                    </div>
+                    {isCourseDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                        {filteredCourses.length > 0 ? (
+                          filteredCourses.slice(0, 4).map((course) => (
+                            <button
+                              key={course}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('Course selected:', course);
+                                setNewStudentData(prev => ({ ...prev, course: course }));
+                                setCourseSearch('');
+                                setIsCourseDropdownOpen(false);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                            >
+                              {course}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-gray-500">No courses found</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
                 <div>
                   <Label htmlFor="student-year">Year Level</Label>
-                  <Input
-                    id="student-year"
-                    placeholder="e.g., 3rd Year"
+                  <Select
                     value={newStudentData.yearLevel}
-                    onChange={(e) => setNewStudentData(prev => ({ ...prev, yearLevel: e.target.value }))}
-                  />
+                    onValueChange={(value) => setNewStudentData(prev => ({ ...prev, yearLevel: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select year level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {YEAR_LEVELS.map((year) => (
+                        <SelectItem key={year} value={year}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               
@@ -393,6 +427,23 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
           ) : (
             
             <div className="space-y-4">
+              {/* Header with Change Counter */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Process Transaction</h3>
+                  <p className="text-sm text-gray-600">Enter transaction amount and process payment</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border w-32 h-20 flex flex-col justify-center mt-2">
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600 mb-1">Change</div>
+                    <div className={`text-2xl font-bold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      ₱{change.toFixed(2)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transaction Amount */}
               <div className="space-y-2">
                 <Label htmlFor="amount">Transaction Amount (₱)</Label>
                 <Input
@@ -406,27 +457,95 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                 />
               </div>
 
-              {/* Quick Amount Buttons */}
+              {/* Item Prices */}
               <div className="space-y-2">
-                <Label>Quick Amounts</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {quickAmounts.map((amount) => (
-                    <Button
-                      key={amount}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickAmount(amount)}
-                      disabled={!currentStudent?.isRegistered}
-                    >
-                      ₱{amount}
-                    </Button>
+                <Label>Item Prices (₱)</Label>
+                <div className="space-y-2">
+                  {itemPrices.map((price, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={price}
+                        onChange={(e) => updateItemPrice(index, e.target.value)}
+                        disabled={!currentStudent?.isRegistered}
+                        className={`flex-1 ${price && parseFloat(price) > 0 ? 'text-green-500' : ''}`}
+                      />
+                      {index > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeItemPrice(index)}
+                          disabled={!currentStudent?.isRegistered}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </Button>
+                      )}
+                      {index === itemPrices.length - 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addItemPrice}
+                          disabled={!currentStudent?.isRegistered}
+                          className="px-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   ))}
+                </div>
+                {totalItemPrices > 0 && (
+                  <div className="text-sm text-gray-600">
+                    Total Item Prices: ₱{totalItemPrices.toFixed(2)}
+                  </div>
+                )}
+              </div>
+
+              {/* Transaction Status */}
+              <div className="space-y-2">
+                <Label>Transaction Status</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant={transactionStatus === 'Paid' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTransactionStatus('Paid')}
+                    disabled={!currentStudent?.isRegistered}
+                    className={transactionStatus === 'Paid' ? 'bg-green-500 hover:bg-green-600' : ''}
+                  >
+                    Paid
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={transactionStatus === 'Partial' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTransactionStatus('Partial')}
+                    disabled={!currentStudent?.isRegistered}
+                    className={transactionStatus === 'Partial' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                  >
+                    Partial
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={transactionStatus === 'Credit' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTransactionStatus('Credit')}
+                    disabled={!currentStudent?.isRegistered}
+                    className={transactionStatus === 'Credit' ? 'bg-red-500 hover:bg-red-600' : ''}
+                  >
+                    Credit
+                  </Button>
                 </div>
               </div>
 
               <Button
                 onClick={handleProcessTransaction}
-                disabled={!currentStudent?.isRegistered || !transactionAmount}
+                disabled={!currentStudent?.isRegistered || !transactionStatus || totalItemPrices === 0 || (change < 0 && transactionStatus !== 'Credit') || (transactionStatus !== 'Credit' && !transactionAmount)}
                 className="w-full"
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
