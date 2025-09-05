@@ -47,6 +47,7 @@ export function SettingsPage() {
 
   // Temporary workaround: use maxDailySpend as maintenance flag
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [dbStatus, setDbStatus] = useState<'connected' | 'error'>('connected');
   const [cashiers, setCashiers] = useState<CashierAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddCashier, setShowAddCashier] = useState(false);
@@ -62,7 +63,8 @@ export function SettingsPage() {
   const [editCashierData, setEditCashierData] = useState({
     name: '',
     email: '',
-    password: ''
+    password: '',
+    oldPassword: ''
   });
 
   
@@ -107,7 +109,7 @@ export function SettingsPage() {
           
           return {
             id: admin.$id,
-            name: admin.username, 
+            name: admin.Fullname, 
             username: admin.username,
             administrator_id: admin.administrator_id,
             isActive: admin.isActive,
@@ -117,8 +119,6 @@ export function SettingsPage() {
         });
         
         setCashiers(transformedCashiers);
-        
-        
         
         try {
           const settingsResponse = await settingsService.getSettings();
@@ -135,10 +135,11 @@ export function SettingsPage() {
         } catch (error) {
           console.log('No settings found, using defaults');
         }
-        
+        setDbStatus('connected');
       } catch (error) {
         console.error('Error loading settings data:', error);
         toast.error('Failed to load settings');
+        setDbStatus('error');
       } finally {
         setLoading(false);
       }
@@ -171,10 +172,17 @@ export function SettingsPage() {
       return;
     }
 
+    const usernameRegex = /^[a-zA-Z]+$/;
+    if (!usernameRegex.test(newCashier.username)) {
+      toast.error('Username can only contain letters.');
+      return;
+    }
+
     try {
       const generatedAdminId = generateAdministratorId();
       
       const cashierData = {
+        Fullname: newCashier.name,
         username: newCashier.username,
         email: `${newCashier.username}@university.edu`,
         administrator_id: generatedAdminId,
@@ -229,7 +237,8 @@ export function SettingsPage() {
     setEditCashierData({
       name: cashier.name,
       email: `${cashier.username}@university.edu`, 
-      password: '' 
+      password: '',
+      oldPassword: ''
     });
     setShowEditCashier(true);
   };
@@ -245,8 +254,25 @@ export function SettingsPage() {
         email: editCashierData.email
       };
 
-      
+      // If new password is provided, validate old password and add to update
       if (editCashierData.password.trim()) {
+        if (!editCashierData.oldPassword.trim()) {
+          toast.error('Please enter your old password to set a new one.');
+          return;
+        }
+
+        // Fetch the admin data to verify the old password
+        const adminToVerify = await adminService.getAdmin(editingCashier.id);
+        if (adminToVerify.password !== editCashierData.oldPassword) {
+          toast.error('The old password you entered is incorrect.');
+          return;
+        }
+
+        if (editCashierData.password.trim().length < 9) {
+          toast.error('New password must be at least 9 characters long.');
+          return;
+        }
+
         updateData.password = editCashierData.password;
       }
 
@@ -255,14 +281,14 @@ export function SettingsPage() {
       setCashiers(prev => 
         prev.map(c => 
           c.id === editingCashier.id 
-            ? { ...c, name: editCashierData.name }
+            ? { ...c, name: editCashierData.name } 
             : c
         )
       );
 
       setShowEditCashier(false);
       setEditingCashier(null);
-      setEditCashierData({ name: '', email: '', password: '' });
+      setEditCashierData({ name: '', email: '', password: '', oldPassword: '' });
       toast.success('Cashier account updated successfully');
     } catch (error) {
       console.error('Error updating cashier:', error);
@@ -406,64 +432,7 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* System Preferences */}
-        <Card>
-          <CardHeader className="p-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Shield className="h-5 w-5" />
-              System Preferences
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Configure system behavior and security
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-sm">Enable Notifications</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Show system notifications
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.enableNotifications}
-                  onCheckedChange={(checked: boolean) => handleSettingChange('enableNotifications', checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-sm">Auto Backup</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Automatically backup data daily
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.enableAutoBackup}
-                  onCheckedChange={(checked: boolean) => handleSettingChange('enableAutoBackup', checked)}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-sm">Require Receipt Print</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Force receipt printing for all transactions
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.requireReceiptPrint}
-                  onCheckedChange={(checked: boolean) => handleSettingChange('requireReceiptPrint', checked)}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        
       </div>
 
       {/* User Management */}
@@ -508,7 +477,10 @@ export function SettingsPage() {
                     <Input
                       id="cashier-username"
                       value={newCashier.username}
-                      onChange={(e) => setNewCashier(prev => ({ ...prev, username: e.target.value }))}
+                      onChange={(e) => {
+                        const filteredValue = e.target.value.replace(/[^a-zA-Z]/g, '');
+                        setNewCashier(prev => ({ ...prev, username: filteredValue }));
+                      }}
                       placeholder="Enter username"
                     />
                   </div>
@@ -562,6 +534,16 @@ export function SettingsPage() {
                   value={editCashierData.email}
                   onChange={(e) => setEditCashierData(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="Enter email address"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-cashier-old-password">Old Password</Label>
+                <Input
+                  id="edit-cashier-old-password"
+                  type="password"
+                  value={editCashierData.oldPassword}
+                  onChange={(e) => setEditCashierData(prev => ({ ...prev, oldPassword: e.target.value }))}
+                  placeholder="Enter old password"
                 />
               </div>
               <div className="space-y-1.5">
@@ -688,26 +670,56 @@ export function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label className="text-xs">Database Status</Label>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm">Connected</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Last Backup</Label>
-              <div className="flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-sm">Today at 2:00 AM</span>
+                <div className={`w-2 h-2 rounded-full ${dbStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm">{dbStatus === 'connected' ? 'Connected' : 'Error'}</span>
               </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">System Version</Label>
-              <span className="text-sm">v1.0.0</span>
+              <span className="text-sm">v1.1.0</span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Management */}
+      <Card>
+        <CardHeader className="p-4">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Database className="h-5 w-5" />
+            Data Management
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Export or import system data
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 pt-0 space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <Label>Export Data</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Export student or transaction data in CSV format.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => exportData('Students')}>Export Students</Button>
+                    <Button variant="outline" size="sm" onClick={() => exportData('Transactions')}>Export Transactions</Button>
+                </div>
+            </div>
+            <Separator />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <Label>Import Data</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Import data from a CSV file.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => importData()}>Import Data</Button>
+            </div>
         </CardContent>
       </Card>
     </div>
