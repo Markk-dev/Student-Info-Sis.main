@@ -707,7 +707,7 @@ export function TransactionsPage() {
                     onSelect={(range) => setDateRange({ from: range?.from,
                       to: range?.to
                     })}
-                    numberOfMonths={2}
+                    numberOfMonths={1}
                   />
                 </PopoverContent>
               </Popover>
