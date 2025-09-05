@@ -33,6 +33,7 @@ interface Student {
 
 export function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
@@ -75,7 +76,8 @@ export function StudentsPage() {
             ? (() => {
                 const dates = studentTransactions.map((txn: any) => {
                   try {
-                    const date = new Date(txn.createdAt);
+                    // Try both createdAt and $createdAt fields
+                    const date = new Date(txn.$createdAt || txn.createdAt);
                     return isNaN(date.getTime()) ? null : date;
                   } catch (error) {
                     return null;
@@ -92,15 +94,23 @@ export function StudentsPage() {
           if (!student.isActive) {
             status = 'suspended';
           } else {
+            // Check if student has made at least 3 transactions in the past 3 days
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
             
-            if (lastTransaction) {
-              const daysSinceLastTransaction = Math.floor((Date.now() - lastTransaction.getTime()) / (1000 * 60 * 60 * 24));
-              if (daysSinceLastTransaction > 3) {
-                status = 'inactive';
+            const recentTransactions = studentTransactions.filter((txn: any) => {
+              try {
+                const txnDate = new Date(txn.$createdAt || txn.createdAt);
+                return !isNaN(txnDate.getTime()) && txnDate >= threeDaysAgo;
+              } catch (error) {
+                return false;
               }
-            } else {
-              
+            });
+            
+            if (recentTransactions.length >= 3) {
               status = 'active';
+            } else {
+              status = 'inactive';
             }
           }
           
@@ -136,6 +146,7 @@ export function StudentsPage() {
         });
         
         setStudents(transformedStudents);
+        setTransactions(transactionsResponse.documents);
       } catch (error) {
         console.error('Error loading students:', error);
         toast.error('Failed to load students');
@@ -147,6 +158,127 @@ export function StudentsPage() {
     loadStudents();
   }, []);
 
+  useEffect(() => {
+    const loadStudents = async () => {
+      try {
+        setLoading(true);
+        
+        
+        await studentService.checkSuspensionStatus();
+        
+        const studentsResponse = await studentService.getStudents();
+        const transactionsResponse = await transactionService.getTransactions();
+        
+        
+        const transformedStudents: Student[] = studentsResponse.documents.map((student: any) => {
+          const studentTransactions = transactionsResponse.documents.filter(
+            (txn: any) => txn.studentId === student.studentId
+          );
+          
+          const totalSpent = studentTransactions.reduce((sum: number, txn: any) => {
+            return sum + (txn.status === 'Paid' ? txn.amount : 0);
+          }, 0);
+          
+          const unpaidAmount = studentTransactions.reduce((sum: number, txn: any) => {
+            return sum + (txn.status === 'Credit' ? Math.abs(txn.amount) : 0);
+          }, 0);
+          
+          const lastTransaction = studentTransactions.length > 0 
+            ? (() => {
+                const dates = studentTransactions.map((txn: any) => {
+                  try {
+                    // Try both createdAt and $createdAt fields
+                    const date = new Date(txn.$createdAt || txn.createdAt);
+                    return isNaN(date.getTime()) ? null : date;
+                  } catch (error) {
+                    return null;
+                  }
+                }).filter(date => date !== null);
+                
+                return dates.length > 0 ? new Date(Math.max(...dates.map(d => d!.getTime()))) : undefined;
+              })()
+            : undefined;
+          
+          
+          let status: 'active' | 'flagged' | 'suspended' | 'inactive' = 'active';
+          
+          if (!student.isActive) {
+            status = 'suspended';
+          } else {
+            // Check if student has made at least 3 transactions in the past 3 days
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+            
+            const recentTransactions = studentTransactions.filter((txn: any) => {
+              try {
+                const txnDate = new Date(txn.$createdAt || txn.createdAt);
+                return !isNaN(txnDate.getTime()) && txnDate >= threeDaysAgo;
+              } catch (error) {
+                return false;
+              }
+            });
+            
+            if (recentTransactions.length >= 3) {
+              status = 'active';
+            } else {
+              status = 'inactive';
+            }
+          }
+          
+          return {
+            id: student.studentId,
+            name: `${student.firstName} ${student.lastName}`,
+            course: student.course,
+            yearLevel: student.yearLevel,
+            registrationDate: (() => {
+              try {
+                const date = new Date(student.createdAt);
+                return isNaN(date.getTime()) ? new Date() : date;
+              } catch (error) {
+                return new Date();
+              }
+            })(),
+            totalTransactions: studentTransactions.length,
+            totalSpent,
+            status,
+            lastTransaction,
+            issues: [], 
+            unpaidAmount,
+            email: student.email,
+            suspensionDate: student.suspensionDate ? (() => {
+              try {
+                const date = new Date(student.suspensionDate);
+                return isNaN(date.getTime()) ? undefined : date;
+              } catch (error) {
+                return undefined;
+              }
+            })() : undefined
+          };
+        });
+        
+        setStudents(transformedStudents);
+        setTransactions(transactionsResponse.documents);
+      } catch (error) {
+        console.error('Error loading students:', error);
+        toast.error('Failed to load students');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleTransactionUpdate = () => {
+      loadStudents();
+    };
+
+    window.addEventListener('transactionCreated', handleTransactionUpdate);
+    window.addEventListener('transactionUpdated', handleTransactionUpdate);
+
+    return () => {
+      window.removeEventListener('transactionCreated', handleTransactionUpdate);
+      window.removeEventListener('transactionUpdated', handleTransactionUpdate);
+    };
+  }, []);
+
   
   const courses = useMemo(() => {
     const uniqueCourses = [...new Set(students.map(s => s.course))];
@@ -154,9 +286,8 @@ export function StudentsPage() {
   }, [students]);
 
   const yearLevels = useMemo(() => {
-    const uniqueYears = [...new Set(students.map(s => s.yearLevel))];
-    return uniqueYears.sort();
-  }, [students]);
+    return ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+  }, []);
 
   
   const filteredStudents = useMemo(() => {
@@ -477,12 +608,12 @@ export function StudentsPage() {
         setActionType(null);
         setActionNote('');
       }}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-2xl font-bold">
+        <DialogContent className="max-w-4xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-bold">
               {actionType ? `${actionType === 'flag' ? 'Flag' : 'Report Issue for'} Student` : 'Student Details'}
             </DialogTitle>
-            <DialogDescription className="text-base">
+            <DialogDescription className="text-sm">
               {selectedStudent?.name} ({selectedStudent?.id})
             </DialogDescription>
           </DialogHeader>
@@ -514,76 +645,129 @@ export function StudentsPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* Student Info */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Student ID</Label>
-                    <p className="font-mono text-lg font-semibold mt-1">{selectedStudent?.id}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Name</Label>
-                    <p className="text-lg font-semibold mt-1">{selectedStudent?.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-                    <p className="text-lg mt-1">{selectedStudent?.email}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Course</Label>
-                    <p className="text-lg mt-1">{selectedStudent?.course}</p>
-                  </div>
+            <div className="space-y-3">
+              {/* Student Header */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900">Student Information</h3>
+                  <p className="text-xs text-gray-600">Student #{selectedStudent?.id}</p>
                 </div>
                 
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Year Level</Label>
-                    <p className="text-lg mt-1">{selectedStudent?.yearLevel}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Registration Date</Label>
-                    <p className="text-lg mt-1">{selectedStudent && formatDate(selectedStudent.registrationDate)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                    <div className="mt-1">{selectedStudent && getStatusBadge(selectedStudent.status)}</div>
-                  </div>
-                  {selectedStudent?.suspensionDate && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
                     <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Suspension End Date</Label>
-                      <p className="text-lg text-red-600 mt-1">{format(new Date(selectedStudent.suspensionDate), "PPP")}</p>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Student ID</Label>
+                      <p className="text-xs font-semibold text-gray-900 mt-1 font-mono">{selectedStudent?.id}</p>
                     </div>
-                  )}
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Student Name</Label>
+                      <p className="text-xs font-semibold text-gray-900 mt-1">{selectedStudent?.name}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Course</Label>
+                      <p className="text-xs font-medium text-gray-900 mt-1">{selectedStudent?.course}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Year Level</Label>
+                      <p className="text-xs font-medium text-gray-900 mt-1">{selectedStudent?.yearLevel}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div>
+                      <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</Label>
+                      <div className="mt-1">{selectedStudent && getStatusBadge(selectedStudent.status)}</div>
+                    </div>
+                    {selectedStudent?.suspensionDate && (
+                      <div>
+                        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Suspension End Date</Label>
+                        <p className="text-xs text-red-600 mt-1">{format(new Date(selectedStudent.suspensionDate), "PPP")}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Transaction Summary */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-                <div className="text-center">
-                  <Label className="text-sm font-medium text-muted-foreground">Total Transactions</Label>
-                  <p className="text-2xl font-bold mt-1">{selectedStudent?.totalTransactions || 0}</p>
+              {/* Transaction Summary & Status */}
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Transaction Summary</h3>
                 </div>
-                <div className="text-center">
-                  <Label className="text-sm font-medium text-muted-foreground">Total Spent</Label>
-                  <p className="text-2xl font-bold mt-1">₱{selectedStudent?.totalSpent.toFixed(2) || '0.00'}</p>
+                
+                {/* Financial Summary */}
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="text-center">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Transactions</Label>
+                    <p className="text-lg font-bold text-blue-600 mt-1">{selectedStudent?.totalTransactions || 0}</p>
+                    <p className="text-xs text-gray-500">All time</p>
+                  </div>
+                  <div className="text-center">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Spent</Label>
+                    <p className="text-lg font-bold text-green-600 mt-1">₱{selectedStudent?.totalSpent.toFixed(2) || '0.00'}</p>
+                    <p className="text-xs text-gray-500">Amount paid</p>
+                  </div>
+                  <div className="text-center">
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Unpaid Amount</Label>
+                    <p className={`text-lg font-bold mt-1 ${(selectedStudent?.unpaidAmount ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      ₱{(selectedStudent?.unpaidAmount ?? 0).toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">Outstanding balance</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <Label className="text-sm font-medium text-muted-foreground">Unpaid Amount</Label>
-                  <p className={`text-2xl font-bold mt-1 ${(selectedStudent?.unpaidAmount ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    ₱{(selectedStudent?.unpaidAmount ?? 0).toFixed(2)}
-                  </p>
-                </div>
+
+                {/* Status Breakdown */}
+                {(() => {
+                  // Get all transactions for this student to count by status
+                  const allTransactions = transactions.filter(t => t.studentId === selectedStudent?.id);
+                  const paidCount = allTransactions.filter(t => t.status === 'Paid').length;
+                  const partialCount = allTransactions.filter(t => t.status === 'Partial').length;
+                  const creditCount = allTransactions.filter(t => t.status === 'Credit').length;
+
+                  return (
+                    <div className="border-t pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-semibold text-gray-900">Status Breakdown</h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="text-center">
+                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                            <span className="text-sm font-bold text-green-600">{paidCount}</span>
+                          </div>
+                          <p className="text-xs font-medium text-gray-900">Paid</p>
+                          <p className="text-xs text-gray-500">Completed</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                            <span className="text-sm font-bold text-yellow-600">{partialCount}</span>
+                          </div>
+                          <p className="text-xs font-medium text-gray-900">Partial</p>
+                          <p className="text-xs text-gray-500">Incomplete</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                            <span className="text-sm font-bold text-red-600">{creditCount}</span>
+                          </div>
+                          <p className="text-xs font-medium text-gray-900">Credit</p>
+                          <p className="text-xs text-gray-500">Outstanding</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Issues */}
-              {selectedStudent?.issues.length && selectedStudent?.issues.length > 0 && (
-                <div>
-                  <Label>Issues & Notes</Label>
-                  <div className="space-y-2 mt-2">
+              {selectedStudent?.issues && selectedStudent.issues.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Issues & Notes</h3>
+                  <div className="space-y-1">
                     {selectedStudent?.issues.map((issue, index) => (
-                      <div key={index} className="p-3 bg-muted rounded-lg">
-                        <p className="text-sm">{issue}</p>
+                      <div key={index} className="p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-xs text-gray-700">{issue}</p>
                       </div>
                     ))}
                   </div>

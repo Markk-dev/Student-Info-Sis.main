@@ -447,6 +447,9 @@ export function TransactionsPage() {
       } else {
         toast.success(`Partial payment of ₱${payment.toFixed(2)} processed. Remaining balance: ₱${Math.abs(newAmount).toFixed(2)}`);
       }
+      
+      // Dispatch event to notify students page of transaction update
+      window.dispatchEvent(new CustomEvent('transactionUpdated'));
     } catch (error) {
       console.error('Error processing payment:', error);
       toast.error('Failed to process payment');
