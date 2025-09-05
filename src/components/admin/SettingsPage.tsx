@@ -334,46 +334,37 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
 
       {/* Settings Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* General Settings */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="p-4">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Database className="h-5 w-5" />
               System Maintenance
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Control system access and maintenance mode
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="p-4 pt-0 space-y-4">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <div className="space-y-0.5">
-                  <Label>System Maintenance Mode</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Temporarily close all login/register for the student side for system maintenance
+                  <Label>Maintenance Mode</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Temporarily disable student login and registration.
                   </p>
                 </div>
                 <Switch
                   checked={maintenanceMode}
                   onCheckedChange={async (checked: boolean) => {
                     try {
-                      // Update database
                       await settingsService.updateSettings({ maxDailySpend: checked ? 0 : 1000 });
-                      
-                      // Update local state
                       setMaintenanceMode(checked);
-                      
-                      // Update settings state
-                      setSettings(prev => ({
-                        ...prev,
-                        maxDailySpend: checked ? 0 : 1000
-                      }));
-                      
+                      setSettings(prev => ({ ...prev, maxDailySpend: checked ? 0 : 1000 }));
                       toast.success(`System maintenance ${checked ? 'enabled' : 'disabled'}`);
                     } catch (error) {
                       console.error('Failed to update maintenance mode:', error);
@@ -384,35 +375,30 @@ export function SettingsPage() {
               </div>
               
               {maintenanceMode && (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg h-full">
-                  <div className="flex flex-col justify-between h-full">
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center justify-between gap-2">
                     <div className='flex items-center gap-2'>
-                      <AlertOctagon className='text-icon flex flex-col font-bold text-yellow-800'/>
-                      <p className='font-bold'>Maintenance</p>
+                      <AlertOctagon className='h-4 w-4 text-yellow-800'/>
+                      <p className='font-semibold text-sm text-yellow-800'>Maintenance Active</p>
                     </div>
-
-                    <div className='flex justify-between items-center'>
-                       <p className='text-xs'>The system is temporarily closed for maintenance.</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            await settingsService.updateSettings({ maxDailySpend: 1000 });
-                            setMaintenanceMode(false);
-                            setSettings(prev => ({ ...prev, maxDailySpend: 1000 }));
-                            toast.success('Maintenance mode disabled');
-                          } catch (error) {
-                            console.error('Failed to disable maintenance mode:', error);
-                            toast.error('Failed to disable maintenance mode');
-                          }
-                        }}
-                        className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
-                      >
-                        Active
-                      </Button>
-                    </div>
-
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await settingsService.updateSettings({ maxDailySpend: 1000 });
+                          setMaintenanceMode(false);
+                          setSettings(prev => ({ ...prev, maxDailySpend: 1000 }));
+                          toast.success('Maintenance mode disabled');
+                        } catch (error) {
+                          console.error('Failed to disable maintenance mode:', error);
+                          toast.error('Failed to disable maintenance mode');
+                        }
+                      }}
+                      className="text-yellow-700 border-yellow-300 hover:bg-yellow-100 h-7 text-xs"
+                    >
+                      Disable
+                    </Button>
                   </div>
                 </div>
               )}
@@ -422,21 +408,21 @@ export function SettingsPage() {
 
         {/* System Preferences */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="p-4">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Shield className="h-5 w-5" />
               System Preferences
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Configure system behavior and security
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
+          <CardContent className="p-4 pt-0 space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Enable Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
+                  <Label className="text-sm">Enable Notifications</Label>
+                  <p className="text-xs text-muted-foreground">
                     Show system notifications
                   </p>
                 </div>
@@ -450,8 +436,8 @@ export function SettingsPage() {
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Auto Backup</Label>
-                  <p className="text-sm text-muted-foreground">
+                  <Label className="text-sm">Auto Backup</Label>
+                  <p className="text-xs text-muted-foreground">
                     Automatically backup data daily
                   </p>
                 </div>
@@ -465,8 +451,8 @@ export function SettingsPage() {
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Require Receipt Print</Label>
-                  <p className="text-sm text-muted-foreground">
+                  <Label className="text-sm">Require Receipt Print</Label>
+                  <p className="text-xs text-muted-foreground">
                     Force receipt printing for all transactions
                   </p>
                 </div>
@@ -482,33 +468,33 @@ export function SettingsPage() {
 
       {/* User Management */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <UserPlus className="h-5 w-5" />
                 User Management
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-xs">
                 Manage admin and cashier accounts
               </CardDescription>
             </div>
             <Dialog open={showAddCashier} onOpenChange={setShowAddCashier}>
               <DialogTrigger asChild>
-                <Button>
+                <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Cashier
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-sm">
                 <DialogHeader>
                   <DialogTitle>Add New Cashier</DialogTitle>
-                  <DialogDescription>
-                    Create a new cashier account for the system. Administrator ID will be automatically generated.
+                  <DialogDescription className="text-sm">
+                    Create a new cashier account.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
                     <Label htmlFor="cashier-name">Full Name</Label>
                     <Input
                       id="cashier-name"
@@ -517,7 +503,7 @@ export function SettingsPage() {
                       placeholder="Enter full name"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="cashier-username">Username</Label>
                     <Input
                       id="cashier-username"
@@ -526,7 +512,7 @@ export function SettingsPage() {
                       placeholder="Enter username"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label htmlFor="cashier-password">Password</Label>
                     <Input
                       id="cashier-password"
@@ -536,12 +522,12 @@ export function SettingsPage() {
                       placeholder="Enter password"
                     />
                   </div>
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2 pt-2">
                     <Button variant="outline" onClick={() => setShowAddCashier(false)}>
                       Cancel
                     </Button>
                     <Button onClick={handleAddCashier}>
-                      Create Account
+                      Create
                     </Button>
                   </div>
                 </div>
@@ -550,17 +536,16 @@ export function SettingsPage() {
           </div>
         </CardHeader>
 
-        {/* Edit Cashier Modal */}
         <Dialog open={showEditCashier} onOpenChange={setShowEditCashier}>
-          <DialogContent>
+          <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Edit Cashier Account</DialogTitle>
+              <DialogTitle>Edit Cashier</DialogTitle>
               <DialogDescription>
-                Update cashier account information. Leave password blank to keep current password.
+                Update account info. Leave password blank to keep it.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
                 <Label htmlFor="edit-cashier-name">Full Name</Label>
                 <Input
                   id="edit-cashier-name"
@@ -569,7 +554,7 @@ export function SettingsPage() {
                   placeholder="Enter full name"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="edit-cashier-email">Email</Label>
                 <Input
                   id="edit-cashier-email"
@@ -579,57 +564,49 @@ export function SettingsPage() {
                   placeholder="Enter email address"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-cashier-password">New Password (optional)</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-cashier-password">New Password</Label>
                 <Input
                   id="edit-cashier-password"
                   type="password"
                   value={editCashierData.password}
                   onChange={(e) => setEditCashierData(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="Enter new password or leave blank"
+                  placeholder="Optional"
                 />
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-2">
                 <Button 
                   variant="outline" 
-                  onClick={() => {
-                    setShowEditCashier(false);
-                    setEditingCashier(null);
-                    setEditCashierData({ name: '', email: '', password: '' });
-                  }}
+                  onClick={() => setShowEditCashier(false)}
                 >
                   Cancel
                 </Button>
                 <Button onClick={handleUpdateCashier}>
-                  Update Account
+                  Update
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Delete Cashier Confirmation Modal */}
         <Dialog open={showDeleteCashier} onOpenChange={setShowDeleteCashier}>
-          <DialogContent>
+          <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Delete Cashier Account</DialogTitle>
+              <DialogTitle>Delete Cashier</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete this cashier account? This action cannot be undone.
+                Are you sure you want to delete this account?
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="space-y-3">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-800">
-                  <strong>Warning:</strong> This will permanently remove the user account "{deletingCashier?.name}" from the system.
+                  Permanently remove <strong>{deletingCashier?.name}</strong>.
                 </p>
               </div>
               <div className="flex justify-end gap-2">
                 <Button 
                   variant="outline" 
-                  onClick={() => {
-                    setShowDeleteCashier(false);
-                    setDeletingCashier(null);
-                  }}
+                  onClick={() => setShowDeleteCashier(false)}
                 >
                   Cancel
                 </Button>
@@ -637,75 +614,55 @@ export function SettingsPage() {
                   variant="destructive"
                   onClick={handleDeleteCashier}
                 >
-                  Delete Account
+                  Delete
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Administrator ID</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="px-4">Name</TableHead>
+                  <TableHead className="hidden sm:table-cell px-4">Username</TableHead>
+                  <TableHead className="hidden md:table-cell px-4">Admin ID</TableHead>
+                  <TableHead className="px-4">Status</TableHead>
+                  <TableHead className="hidden lg:table-cell px-4">Last Login</TableHead>
+                  <TableHead className="px-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {cashiers.map((cashier) => (
                   <TableRow key={cashier.id}>
-                    <TableCell className="font-medium">{cashier.name}</TableCell>
-                    <TableCell className="font-mono">{cashier.username}</TableCell>
-                    <TableCell className="font-mono">{cashier.administrator_id}</TableCell>
-                    <TableCell>
-                      <Badge variant={cashier.isActive ? 'default' : 'destructive'}>
+                    <TableCell className="font-medium px-4 py-2 text-sm">{cashier.name}</TableCell>
+                    <TableCell className="hidden sm:table-cell font-mono px-4 py-2 text-xs">{cashier.username}</TableCell>
+                    <TableCell className="hidden md:table-cell font-mono px-4 py-2 text-xs">{cashier.administrator_id}</TableCell>
+                    <TableCell className="px-4 py-2">
+                      <Badge variant={cashier.isActive ? 'default' : 'destructive'} className="text-xs">
                         {cashier.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {cashier.lastLogin ? (
-                        <div>
-                          <p className="text-sm">{formatDate(cashier.lastLogin)}</p>
-                          <p className="text-xs text-muted-foreground">{formatTime(cashier.lastLogin)}</p>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Never</span>
-                      )}
+                    <TableCell className="hidden lg:table-cell px-4 py-2 text-xs">
+                      {cashier.lastLogin ? formatDate(cashier.lastLogin) : 'Never'}
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm">{formatDate(cashier.createdAt)}</p>
-                        <p className="text-xs text-muted-foreground">{formatTime(cashier.createdAt)}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Badge
-                          variant={cashier.isActive ? 'destructive' : 'default'}
-                          className="cursor-pointer hover:opacity-80 transition-opacity text-xs px-2 py-1"
-                          onClick={() => toggleCashierStatus(cashier.id)}
-                        >
-                          {cashier.isActive ? 'Deactivate' : 'Activate'}
-                        </Badge>
+                    <TableCell className="px-4 py-2">
+                      <div className="flex gap-1">
                         <Button 
                           variant="ghost" 
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => handleEditCashier(cashier)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
-                          size="sm"
+                          size="icon"
                           onClick={() => confirmDeleteCashier(cashier)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -721,33 +678,33 @@ export function SettingsPage() {
 
       {/* System Information */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="p-4">
+          <CardTitle className="flex items-center gap-2 text-base">
             <Bell className="h-5 w-5" />
             System Information
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs">
             Current system status and information
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <Label>Database Status</Label>
+        <CardContent className="p-4 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Database Status</Label>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span className="text-sm">Connected</span>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Last Backup</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Last Backup</Label>
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-sm">Today at 2:00 AM</span>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>System Version</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">System Version</Label>
               <span className="text-sm">v1.0.0</span>
             </div>
           </div>

@@ -569,7 +569,6 @@ export function TransactionsPage() {
                 return txnDate && txnDate.toDateString() === today.toDateString() && (t.status === 'Paid' || t.status === 'completed' || t.status === 'Partial');
               })
               .reduce((sum, t) => {
-                // For revenue, use the actual money received (transactionAmount)
                 if (t.status === 'Partial') {
                   return sum + (t.transactionAmount || 0);
                 } else {
@@ -595,7 +594,6 @@ export function TransactionsPage() {
                        (t.status === 'Paid' || t.status === 'completed' || t.status === 'Partial');
               })
               .reduce((sum, t) => {
-                // For revenue, use the actual money received (transactionAmount)
                 if (t.status === 'Partial') {
                   return sum + (t.transactionAmount || 0);
                 } else {
@@ -614,7 +612,6 @@ export function TransactionsPage() {
           <CardContent>
             <div className="text-2xl font-bold  text-white">₱{transactions.length > 0 
               ? (transactions.reduce((sum, t) => {
-                  // For average, use the actual money received (transactionAmount)
                   if (t.status === 'Partial') {
                     return sum + (t.transactionAmount || 0);
                   } else {
@@ -707,8 +704,7 @@ export function TransactionsPage() {
                     mode="range"
                     defaultMonth={dateRange.from && !isNaN(dateRange.from.getTime()) ? dateRange.from : undefined}
                     selected={dateRange}
-                    onSelect={(range) => setDateRange({
-                      from: range?.from,
+                    onSelect={(range) => setDateRange({ from: range?.from,
                       to: range?.to
                     })}
                     numberOfMonths={2}
@@ -734,68 +730,54 @@ export function TransactionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Transaction Number</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Course</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Item Price</TableHead>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Cashier</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="font-bold">Student</TableHead>
+                  <TableHead className="font-bold text-right">Amount</TableHead>
+                  <TableHead className="font-bold">Status</TableHead>
+                  <TableHead className="font-bold hidden sm:table-cell">Date</TableHead>
+                  <TableHead className="font-bold text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
-                    <TableCell className="font-mono">{transaction.id}</TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{transaction.studentName}</p>
-                        <p className="text-sm text-muted-foreground font-mono">{transaction.studentId}</p>
+                        <p className="text-sm">{transaction.studentName}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{transaction.studentId}</p>
                       </div>
                     </TableCell>
-                    <TableCell>{transaction.course}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <span className={
                         transaction.status === 'Credit' 
-                          ? 'text-red-600 font-medium' 
+                          ? 'text-red-600' 
                           : transaction.status === 'Partial' 
-                            ? 'text-yellow-600 font-medium' 
+                            ? 'text-yellow-600' 
                             : ''
                       }>
                         ₱{transaction.amount.toFixed(2)}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      {transaction.totalItemAmount ? (
-                        <span className="font-medium">₱{transaction.totalItemAmount.toFixed(2)}</span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
+                    <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <div>
-                        <p className="font-medium">{formatDate(transaction.timestamp)}</p>
-                        <p className="text-sm text-muted-foreground font-mono">
-                          {transaction.timestamp.toISOString().split('T')[1].split('.')[0]}
-                        </p>
+                        <p className="text-xs">{formatDate(transaction.timestamp)}</p>
+                        <p className="text-xs text-muted-foreground">{formatTime(transaction.timestamp)}</p>
                       </div>
                     </TableCell>
-                    <TableCell>{transaction.cashier}</TableCell>
-                    <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                    <TableCell className="text-right">
+                      <div className="flex gap-1 justify-end">
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => setSelectedTransaction(transaction)}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => {
                             setEditingTransaction(transaction);
                             setPaymentAmount('');
@@ -805,9 +787,9 @@ export function TransactionsPage() {
                         </Button>
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => setDeletingTransaction(transaction)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -821,7 +803,7 @@ export function TransactionsPage() {
           
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t">
+             <div className="flex items-center justify-between px-6 py-4 border-t">
               <div className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </div>
@@ -843,7 +825,6 @@ export function TransactionsPage() {
                   Previous
                 </Button>
                 
-                {/* Page Numbers */}
                 <div className="flex items-center space-x-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum;
@@ -895,70 +876,70 @@ export function TransactionsPage() {
 
       {/* Transaction Details Dialog */}
       <Dialog open={!!selectedTransaction} onOpenChange={() => setSelectedTransaction(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-2xl font-bold">Transaction Details</DialogTitle>
-            <DialogDescription className="text-base">
-              Transaction Number: <span className="font-mono font-medium ml-2">{selectedTransaction?.id}</span>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader className="pb-3">
+            <DialogTitle className="text-xl font-bold">Transaction Details</DialogTitle>
+            <DialogDescription className="text-sm">
+              Transaction Number: <span className="font-mono font-medium ml-1">{selectedTransaction?.id}</span>
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-8">
+          <div className="space-y-4">
             {/* Transaction Header */}
-            <div className="bg-gray-50 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Transaction Information</h3>
-                  <p className="text-sm text-gray-600">Transaction #{selectedTransaction?.id}</p>
+                  <h3 className="text-base font-semibold text-gray-900">Transaction Information</h3>
+                  <p className="text-xs text-gray-600">Transaction #{selectedTransaction?.id}</p>
                 </div>
                 <div className="text-right">
                   {selectedTransaction && getStatusBadge(selectedTransaction.status)}
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Student</Label>
-                    <p className="text-lg font-semibold text-gray-900 mt-1">{selectedTransaction?.studentName}</p>
-                    <p className="text-sm text-gray-600 font-mono">{selectedTransaction?.studentId}</p>
+                    <p className="text-base font-semibold text-gray-900 mt-1">{selectedTransaction?.studentName}</p>
+                    <p className="text-xs text-gray-600 font-mono">{selectedTransaction?.studentId}</p>
                   </div>
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Course</Label>
-                    <p className="text-base font-medium text-gray-900 mt-1">{selectedTransaction?.course}</p>
+                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedTransaction?.course}</p>
                   </div>
                 </div>
                 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transaction Amount</Label>
-                    <p className="text-2xl font-bold text-blue-600 mt-1">
+                    <p className="text-xl font-bold text-blue-600 mt-1">
                       ₱{(selectedTransaction?.transactionAmount || 0).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">Amount paid by student</p>
                   </div>
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Item Value</Label>
-                    <p className="text-2xl font-bold text-green-600 mt-1">
+                    <p className="text-xl font-bold text-green-600 mt-1">
                       ₱{(selectedTransaction?.totalItemAmount || 0).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">Total item cost</p>
                   </div>
                 </div>
                 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date & Time</Label>
-                    <p className="text-base font-medium text-gray-900 mt-1">
+                    <p className="text-sm font-medium text-gray-900 mt-1">
                       {selectedTransaction && formatDate(selectedTransaction.timestamp)}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs text-gray-600">
                       {selectedTransaction && formatTime(selectedTransaction.timestamp)}
                     </p>
                   </div>
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cashier</Label>
-                    <p className="text-base font-medium text-gray-900 mt-1">{selectedTransaction?.cashier}</p>
+                    <p className="text-sm font-medium text-gray-900 mt-1">{selectedTransaction?.cashier}</p>
                   </div>
                 </div>
               </div>
@@ -966,10 +947,10 @@ export function TransactionsPage() {
 
             {/* Outstanding Balance for this Transaction only */}
             {selectedTransaction && (
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Outstanding Balance</h3>
-                  <div className="text-sm text-gray-500">
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900">Outstanding Balance</h3>
+                  <div className="text-xs text-gray-500">
                     {(() => {
                       const hasOutstanding =
                         selectedTransaction.status === 'Credit' ||
@@ -980,7 +961,7 @@ export function TransactionsPage() {
                   </div>
                 </div>
                 
-                <div className="space-y-3">
+                <div>
                   {(() => {
                     const showThis =
                       selectedTransaction.status === 'Credit' ||
@@ -988,44 +969,40 @@ export function TransactionsPage() {
                     
                     if (!showThis) {
                       return (
-                        <div className="text-center py-8">
-                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="text-center py-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
-                          <h4 className="text-lg font-medium text-gray-900 mb-2">No Outstanding Balance</h4>
-                          <p className="text-gray-600">This transaction has no pending balance.</p>
+                          <h4 className="text-sm font-medium text-gray-900 mb-1">No Outstanding Balance</h4>
+                          <p className="text-xs text-gray-600">This transaction has no pending balance.</p>
                         </div>
                       );
                     }
                     
                     const txn = selectedTransaction;
                     return (
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                        <div className="flex items-center space-x-4">
-                          <div className={`w-3 h-3 rounded-full ${
-                            txn.status === 'Credit' ? 'bg-red-500' : 'bg-yellow-500'
-                          }`}></div>
+                      <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${txn.status === 'Credit' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
                           <div>
-                            <p className="font-medium text-gray-900">
+                            <p className="text-xs font-medium text-gray-900">
                               Transaction #{txn.id.slice(-8)}
                             </p>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-xs text-gray-600">
                               {formatDate(txn.timestamp)} • {txn.status}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`text-xl font-bold ${
-                            txn.status === 'Credit' ? 'text-red-600' : 'text-yellow-600'
-                          }`}>
+                          <p className={`text-sm font-bold ${txn.status === 'Credit' ? 'text-red-600' : 'text-yellow-600'}`}>
                             ₱{txn.status === 'Credit' 
                               ? (txn.totalItemAmount || 0).toFixed(2)
                               : Math.abs(txn.amount).toFixed(2)
                             }
                           </p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-xs text-gray-500">
                             {txn.status === 'Credit' ? 'Outstanding Loan' : 'Remaining Balance'}
                           </p>
                         </div>
@@ -1090,7 +1067,7 @@ export function TransactionsPage() {
                 <div className="text-center">
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Outstanding</Label>
                   <p className="text-xl font-bold text-amber-600 mt-1">
-                    ₱{(
+                    ₱{( 
                       editingTransaction &&
                       (editingTransaction.status === 'Partial' || editingTransaction.status === 'Credit')
                         ? Math.abs(editingTransaction.amount || 0)

@@ -280,16 +280,16 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Student ID Section */}
       <Card>
-        <CardHeader>
-          <CardTitle>Student ID</CardTitle>
-          <CardDescription>Enter student ID to begin transaction</CardDescription>
+        <CardHeader className="p-4">
+          <CardTitle className="text-base">Student ID</CardTitle>
+          <CardDescription className="text-xs">Enter student ID to begin transaction</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="student-id">Student ID</Label>
+        <CardContent className="space-y-3 p-4 pt-0">
+          <div className="space-y-1.5">
+            <Label htmlFor="student-id" className="text-sm">Student ID</Label>
             <div className="flex gap-2">
               <Input
                 ref={inputRef}
@@ -299,48 +299,49 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                 value={studentId}
                 onChange={handleStudentIdChange}
                 onKeyDown={(e) => e.key === 'Enter' && handleScan()}
+                className="h-9"
               />
-              <Button onClick={handleScan} disabled={!studentId.trim()}>
-                Find Student
+              <Button onClick={handleScan} disabled={!studentId.trim()} size="sm">
+                Find
               </Button>
             </div>
           </div>
 
           {/* Student Information Display */}
           {currentStudent && (
-            <div className="space-y-4">
+            <div className="space-y-3 pt-2">
               <Separator />
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-medium">Student Information</h3>
+                  <h3 className="font-medium text-sm">Student Information</h3>
                   {currentStudent.isRegistered ? (
-                    <Badge variant="default" className="bg-green-100 text-green-800">
+                    <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
                       <UserCheck className="h-3 w-3 mr-1" />
                       Registered
                     </Badge>
                   ) : (
-                    <Badge variant="destructive">
+                    <Badge variant="destructive" className="text-xs">
                       <UserX className="h-3 w-3 mr-1" />
                       Not Registered
                     </Badge>
                   )}
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Student ID</p>
+                    <p className="text-muted-foreground">ID</p>
                     <p className="font-mono">{currentStudent.id}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Name</p>
-                    <p>{currentStudent.firstName && currentStudent.lastName ? `${currentStudent.firstName} ${currentStudent.lastName}` : 'Not set'}</p>
+                    <p className="truncate">{currentStudent.firstName && currentStudent.lastName ? `${currentStudent.firstName} ${currentStudent.lastName}` : 'Not set'}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Course</p>
                     <p>{currentStudent.course || 'Not set'}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Year Level</p>
+                    <p className="text-muted-foreground">Year</p>
                     <p>{currentStudent.yearLevel || 'Not set'}</p>
                   </div>
                 </div>
@@ -353,87 +354,87 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       {/* Transaction/Registration Section */}
       <Card>
         {isNewStudent && (
-          <CardHeader>
-            <CardTitle>Register New Student</CardTitle>
-            <CardDescription>
-              Enter student information to register them in the system
+          <CardHeader className="p-4">
+            <CardTitle className="text-base">Register New Student</CardTitle>
+            <CardDescription className="text-xs">
+              Enter student information to register them.
             </CardDescription>
           </CardHeader>
         )}
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 p-4">
           {isNewStudent ? (
             
-            <div className="space-y-4">
+            <div className="space-y-3">
               <Alert>
                 <UserX className="h-4 w-4" />
-                <AlertDescription>
-                  This student is not registered in the system. Please register them first.
+                <AlertDescription className="text-xs">
+                  This student is not registered. Please register them first.
                 </AlertDescription>
               </Alert>
               
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label htmlFor="student-firstName">First Name</Label>
+                    <Label htmlFor="student-firstName" className="text-xs">First Name</Label>
                     <Input
                       id="student-firstName"
-                      placeholder="Enter first name"
+                      placeholder="First name"
                       value={newStudentData.firstName}
                       onChange={(e) => setNewStudentData(prev => ({ ...prev, firstName: e.target.value }))}
+                      className="h-9"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="student-lastName">Last Name</Label>
+                    <Label htmlFor="student-lastName" className="text-xs">Last Name</Label>
                     <Input
                       id="student-lastName"
-                      placeholder="Enter last name"
+                      placeholder="Last name"
                       value={newStudentData.lastName}
                       onChange={(e) => setNewStudentData(prev => ({ ...prev, lastName: e.target.value }))}
+                      className="h-9"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <Label htmlFor="student-course">Course</Label>
+                  <Label htmlFor="student-course" className="text-xs">Course</Label>
                   <div className="relative course-dropdown-container">
                     <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-gray-400" />
                       <Input
-                        placeholder="Search and select a course..."
+                        placeholder="Search course..."
                         value={newStudentData.course || courseSearch}
                         onChange={(e) => {
                           setCourseSearch(e.target.value);
-                          // Clear selection when user starts typing
                           if (e.target.value !== newStudentData.course) {
                             setNewStudentData(prev => ({ ...prev, course: '' }));
                           }
                         }}
                         onFocus={() => setIsCourseDropdownOpen(true)}
-                        className={`pl-8 ${newStudentData.course ? 'bg-green-50 border-green-300' : ''}`}
+                        className={`pl-7 h-9 text-xs ${newStudentData.course ? 'bg-green-50 border-green-300' : ''}`}
                       />
                     </div>
                     {isCourseDropdownOpen && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto">
                         {filteredCourses.length > 0 ? (
-                          filteredCourses.slice(0, 4).map((course) => (
+                          filteredCourses.slice(0, 10).map((course) => (
                             <button
                               key={course}
                               type="button"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                console.log('Course selected:', course);
                                 setNewStudentData(prev => ({ ...prev, course: course }));
                                 setCourseSearch('');
                                 setIsCourseDropdownOpen(false);
                               }}
-                              className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                              className="w-full px-3 py-1.5 text-left text-xs hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
                             >
                               {course}
                             </button>
                           ))
                         ) : (
-                          <div className="px-3 py-2 text-gray-500">No courses found</div>
+                          <div className="px-3 py-1.5 text-xs text-gray-500">No courses found</div>
                         )}
                       </div>
                     )}
@@ -441,51 +442,47 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                 </div>
                 
                 <div>
-                  <Label htmlFor="student-year">Year Level</Label>
+                  <Label htmlFor="student-year" className="text-xs">Year Level</Label>
                   <Select
                     value={newStudentData.yearLevel}
                     onValueChange={(value) => setNewStudentData(prev => ({ ...prev, yearLevel: value }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9 text-xs">
                       <SelectValue placeholder="Select year level" />
                     </SelectTrigger>
                     <SelectContent>
                       {YEAR_LEVELS.map((year) => (
-                        <SelectItem key={year} value={year}>
-                          {year}
-                        </SelectItem>
+                        <SelectItem key={year} value={year} className="text-xs">{year}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               
-              <Button onClick={handleRegisterStudent} className="w-full">
+              <Button onClick={handleRegisterStudent} className="w-full" size="sm">
                 Register Student
               </Button>
             </div>
           ) : (
             
-            <div className="space-y-4">
-              {/* Header with Change Counter */}
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold">Process Transaction</h3>
-                  <p className="text-sm text-gray-600">Enter transaction amount and process payment</p>
+                  <h3 className="text-base font-semibold">Process Transaction</h3>
+                  <p className="text-xs text-gray-600">Enter amounts and process payment</p>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg border w-32 h-20 flex flex-col justify-center mt-2">
+                <div className="bg-gray-50 p-2 rounded-lg border w-28">
                   <div className="text-center">
-                    <div className="text-sm text-gray-600 mb-1">Change</div>
-                    <div className={`text-2xl font-bold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className="text-xs text-gray-600 mb-0.5">Change</div>
+                    <div className={`text-xl font-bold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       ₱{change.toFixed(2)}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Transaction Amount */}
-              <div className="space-y-2">
-                <Label htmlFor="amount">Transaction Amount (₱)</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="amount" className="text-sm">Amount Paid (₱)</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -494,12 +491,12 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                   value={transactionAmount}
                   onChange={(e) => setTransactionAmount(e.target.value)}
                   disabled={!currentStudent?.isRegistered}
+                  className="h-9"
                 />
               </div>
 
-              {/* Item Prices */}
-              <div className="space-y-2">
-                <Label>Item Prices (₱)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Item Prices (₱)</Label>
                 <div className="space-y-2">
                   {itemPrices.map((price, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -510,16 +507,16 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                         value={price}
                         onChange={(e) => updateItemPrice(index, e.target.value)}
                         disabled={!currentStudent?.isRegistered}
-                        className={`flex-1 ${price && parseFloat(price) > 0 ? 'text-green-500' : ''}`}
+                        className={`flex-1 h-9 ${price && parseFloat(price) > 0 ? 'text-green-500' : ''}`}
                       />
                       {index > 0 && (
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
+                          size="icon"
                           onClick={() => removeItemPrice(index)}
                           disabled={!currentStudent?.isRegistered}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-red-500 hover:text-red-700 h-8 w-8"
                         >
                           ×
                         </Button>
@@ -528,10 +525,10 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
+                          size="icon"
                           onClick={addItemPrice}
                           disabled={!currentStudent?.isRegistered}
-                          className="px-2"
+                          className="h-8 w-8"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -540,25 +537,14 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                   ))}
                 </div>
                 {totalItemPrices > 0 && (
-                  <div className="text-sm text-gray-600">
-                    Total Item Prices: ₱{totalItemPrices.toFixed(2)}
+                  <div className="text-xs text-gray-600">
+                    Total Item Price: ₱{totalItemPrices.toFixed(2)}
                   </div>
                 )}
               </div>
 
-              {/* Transaction Status */}
-              <div className="space-y-2">
-                <Label>Transaction Status</Label>
-                {totalItemPrices > 0 && (
-                  <div className="text-xs text-gray-600 mb-2">
-                    {transactionAmountNum === 0 
-                      ? "No payment entered - Credit transaction" 
-                      : transactionAmountNum >= totalItemPrices 
-                        ? "Full payment received - Paid transaction" 
-                        : "Partial payment - Partial transaction"
-                    }
-                  </div>
-                )}
+              <div className="space-y-1.5">
+                <Label className="text-sm">Status</Label>
                 <div className="grid grid-cols-3 gap-2">
                   <Button
                     type="button"
@@ -566,7 +552,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     size="sm"
                     onClick={() => setTransactionStatus('Paid')}
                     disabled={isPaidDisabled}
-                    className={transactionStatus === 'Paid' ? 'bg-green-500 hover:bg-green-600' : ''}
+                    className={`text-xs ${transactionStatus === 'Paid' ? 'bg-green-500 hover:bg-green-600' : ''}`}
                   >
                     Paid
                   </Button>
@@ -576,7 +562,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     size="sm"
                     onClick={() => setTransactionStatus('Partial')}
                     disabled={isPartialDisabled}
-                    className={transactionStatus === 'Partial' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}
+                    className={`text-xs ${transactionStatus === 'Partial' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}`}
                   >
                     Partial
                   </Button>
@@ -586,7 +572,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     size="sm"
                     onClick={() => setTransactionStatus('Credit')}
                     disabled={isCreditDisabled}
-                    className={transactionStatus === 'Credit' ? 'bg-red-500 hover:bg-red-600' : ''}
+                    className={`text-xs ${transactionStatus === 'Credit' ? 'bg-red-500 hover:bg-red-600' : ''}`}
                   >
                     Credit
                   </Button>
@@ -597,6 +583,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                 onClick={handleProcessTransaction}
                 disabled={!currentStudent?.isRegistered || !transactionStatus || totalItemPrices === 0 || (change < 0 && transactionStatus !== 'Credit' && transactionStatus !== 'Partial') || (transactionStatus !== 'Credit' && transactionStatus !== 'Partial' && !transactionAmount)}
                 className="w-full"
+                size="sm"
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
                 Process Transaction

@@ -390,84 +390,79 @@ export function StudentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Action Button */}
       <div className="flex justify-end">
-        <Button>
+        <Button size="sm">
           <UserPlus className="h-4 w-4 mr-2" />
           Add Student
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className='bg-primary'>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm  text-white">Total Students</CardTitle>
+          <CardHeader className="p-3 pb-2">
+            <CardTitle className="text-xs text-white">Total Students</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{students.length}</div>
-            <p className="text-xs text-muted-foreground text-white font-bold">Registered in system</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-white">{students.length}</div>
           </CardContent>
         </Card>
 
         <Card className='bg-primary'>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white">Active Students</CardTitle>
+          <CardHeader className="p-3 pb-2">
+            <CardTitle className="text-xs text-white">Active</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl text-white font-bold">{students.filter(s => s.status === 'active').length}</div>
-            <p className="text-xs text-muted-foreground text-white">Currently active</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-white">{students.filter(s => s.status === 'active').length}</div>
           </CardContent>
         </Card>
 
         <Card className='bg-primary'>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white">Flagged Students</CardTitle>
+          <CardHeader className="p-3 pb-2">
+            <CardTitle className="text-xs text-white">Flagged</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{students.filter(s => s.status === 'flagged').length}</div>
-            <p className="text-xs text-muted-foreground text-white">Require attention</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-white">{students.filter(s => s.status === 'flagged').length}</div>
           </CardContent>
         </Card>
 
         <Card className='bg-primary'>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-white">Unpaid Amount</CardTitle>
+          <CardHeader className="p-3 pb-2">
+            <CardTitle className="text-xs text-white">Unpaid</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl text-white">₱{students.reduce((sum, s) => sum + s.unpaidAmount, 0).toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground text-white">Total outstanding</p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-white">₱{students.reduce((sum, s) => sum + s.unpaidAmount, 0).toFixed(2)}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardHeader className='flex flex-col gap-2'>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
+        <CardHeader className='p-4'>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Search className="h-4 w-4" />
             Search & Filter
           </CardTitle>
-          <DottedSeparator/>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="search">Search Students</Label>
+        <CardContent className="p-4 pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="search" className="text-xs">Search</Label>
               <Input
                 id="search"
-                className='text-xs'
-                placeholder="Search by name or ID..."
+                className='text-xs h-9'
+                placeholder="Name or ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Course</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Course</Label>
               <Select value={courseFilter} onValueChange={setCourseFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 text-xs">
                   <SelectValue placeholder="All courses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -479,14 +474,14 @@ export function StudentsPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Year Level</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Year Level</Label>
               <Select value={yearFilter} onValueChange={setYearFilter}>
-                <SelectTrigger>
-                  <SelectValue className='text-xs' placeholder="All years" />
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="All years" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Years</SelectItem>
+                  <SelectItem value="all" className="text-xs">All Years</SelectItem>
                   {yearLevels.map(year => (
                     <SelectItem key={year} className='text-xs' value={year}>{year}</SelectItem>
                   ))}
@@ -494,14 +489,14 @@ export function StudentsPage() {
               </Select>
             </div>
 
-            <div className="space-y-2 ">
-              <Label>Status</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue className='text-xs' placeholder="All statuses" />
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem className='text-xs ' value="all">All Statuses</SelectItem>
+                  <SelectItem className='text-xs' value="all">All Statuses</SelectItem>
                   <SelectItem className='text-xs' value="active">Active</SelectItem>
                   <SelectItem className='text-xs' value="flagged">Flagged</SelectItem>
                   <SelectItem className='text-xs' value="suspended">Suspended</SelectItem>
@@ -515,53 +510,52 @@ export function StudentsPage() {
 
       {/* Students Table */}
       <Card>
-        <CardHeader className='flex flex-col gap-2'>
-          <CardTitle>Student List</CardTitle>
-          <CardDescription>
+        <CardHeader className='p-4'>
+          <CardTitle className="text-base">Student List</CardTitle>
+          <CardDescription className="text-xs">
             Showing {filteredStudents.length} of {students.length} students
           </CardDescription>
-          <DottedSeparator/>
         </CardHeader>
    
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Course & Year</TableHead>
-                  <TableHead>Transactions</TableHead>
-                  <TableHead>Total Spent</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Transaction</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="px-4">Student</TableHead>
+                  <TableHead className="hidden md:table-cell px-4">Course & Year</TableHead>
+                  <TableHead className="hidden sm:table-cell px-4">Transactions</TableHead>
+                  <TableHead className="hidden md:table-cell px-4">Total Spent</TableHead>
+                  <TableHead className="px-4">Status</TableHead>
+                  <TableHead className="hidden lg:table-cell px-4">Last Transaction</TableHead>
+                  <TableHead className="px-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredStudents.map((student) => (
                   <TableRow key={student.id}>
-                    <TableCell>
+                    <TableCell className="px-4 py-2">
                       <div>
-                        <p className="font-medium">{student.name}</p>
-                        <p className="text-sm text-muted-foreground font-mono">{student.id}</p>
+                        <p className="font-medium text-sm">{student.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{student.id}</p>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell px-4 py-2">
                       <div>
-                        <p>{student.course}</p>
-                        <p className="text-sm text-muted-foreground">{student.yearLevel}</p>
+                        <p className="text-sm">{student.course}</p>
+                        <p className="text-xs text-muted-foreground">{student.yearLevel}</p>
                       </div>
                     </TableCell>
-                    <TableCell>{student.totalTransactions}</TableCell>
-                    <TableCell>₱{student.totalSpent.toFixed(2)}</TableCell>
-                    <TableCell>{getStatusBadge(student.status)}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell px-4 py-2 text-sm">{student.totalTransactions}</TableCell>
+                    <TableCell className="hidden md:table-cell px-4 py-2 text-sm">₱{student.totalSpent.toFixed(2)}</TableCell>
+                    <TableCell className="px-4 py-2">{getStatusBadge(student.status)}</TableCell>
+                    <TableCell className="hidden lg:table-cell px-4 py-2 text-sm">
                       {student.lastTransaction ? formatDate(student.lastTransaction) : 'Never'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-4 py-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" className="h-7 w-7">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -608,38 +602,38 @@ export function StudentsPage() {
         setActionType(null);
         setActionNote('');
       }}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-sm md:max-w-2xl">
           <DialogHeader className="pb-2">
-            <DialogTitle className="text-xl font-bold">
+            <DialogTitle className="text-lg font-bold">
               {actionType ? `${actionType === 'flag' ? 'Flag' : 'Report Issue for'} Student` : 'Student Details'}
             </DialogTitle>
-            <DialogDescription className="text-sm">
+            <DialogDescription className="text-xs">
               {selectedStudent?.name} ({selectedStudent?.id})
             </DialogDescription>
           </DialogHeader>
           
           {actionType ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="action-note">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="action-note" className="text-sm">
                   {actionType === 'flag' ? 'Reason for flagging' : 'Issue description'}
                 </Label>
                 <Textarea
                   id="action-note"
-                  placeholder={actionType === 'flag' ? 'Enter reason for flagging this student...' : 'Describe the issue...'}
+                  placeholder={actionType === 'flag' ? 'Enter reason...' : 'Describe the issue...'}
                   value={actionNote}
                   onChange={(e) => setActionNote(e.target.value)}
-                  rows={4}
+                  rows={3}
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => {
+                <Button variant="outline" size="sm" onClick={() => {
                   setActionType(null);
                   setActionNote('');
                 }}>
                   Cancel
                 </Button>
-                <Button onClick={handleSaveAction}>
+                <Button size="sm" onClick={handleSaveAction}>
                   Save {actionType === 'flag' ? 'Flag' : 'Issue'}
                 </Button>
               </div>
@@ -653,7 +647,7 @@ export function StudentsPage() {
                   <p className="text-xs text-gray-600">Student #{selectedStudent?.id}</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <div>
                       <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Student ID</Label>
@@ -683,7 +677,7 @@ export function StudentsPage() {
                     </div>
                     {selectedStudent?.suspensionDate && (
                       <div>
-                        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Suspension End Date</Label>
+                        <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Suspension End</Label>
                         <p className="text-xs text-red-600 mt-1">{format(new Date(selectedStudent.suspensionDate), "PPP")}</p>
                       </div>
                     )}
@@ -700,21 +694,18 @@ export function StudentsPage() {
                 {/* Financial Summary */}
                 <div className="grid grid-cols-3 gap-3 mb-3">
                   <div className="text-center">
-                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Transactions</Label>
-                    <p className="text-lg font-bold text-blue-600 mt-1">{selectedStudent?.totalTransactions || 0}</p>
-                    <p className="text-xs text-gray-500">All time</p>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transactions</Label>
+                    <p className="text-base md:text-lg font-bold text-blue-600 mt-1">{selectedStudent?.totalTransactions || 0}</p>
                   </div>
                   <div className="text-center">
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Spent</Label>
-                    <p className="text-lg font-bold text-green-600 mt-1">₱{selectedStudent?.totalSpent.toFixed(2) || '0.00'}</p>
-                    <p className="text-xs text-gray-500">Amount paid</p>
+                    <p className="text-base md:text-lg font-bold text-green-600 mt-1">₱{selectedStudent?.totalSpent.toFixed(2) || '0.00'}</p>
                   </div>
                   <div className="text-center">
-                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Unpaid Amount</Label>
-                    <p className={`text-lg font-bold mt-1 ${(selectedStudent?.unpaidAmount ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Unpaid</Label>
+                    <p className={`text-base md:text-lg font-bold mt-1 ${(selectedStudent?.unpaidAmount ?? 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
                       ₱{(selectedStudent?.unpaidAmount ?? 0).toFixed(2)}
                     </p>
-                    <p className="text-xs text-gray-500">Outstanding balance</p>
                   </div>
                 </div>
 
@@ -734,25 +725,22 @@ export function StudentsPage() {
                       
                       <div className="grid grid-cols-3 gap-3">
                         <div className="text-center">
-                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                            <span className="text-sm font-bold text-green-600">{paidCount}</span>
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                            <span className="text-xs font-bold text-green-600">{paidCount}</span>
                           </div>
                           <p className="text-xs font-medium text-gray-900">Paid</p>
-                          <p className="text-xs text-gray-500">Completed</p>
                         </div>
                         <div className="text-center">
-                          <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                            <span className="text-sm font-bold text-yellow-600">{partialCount}</span>
+                          <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                            <span className="text-xs font-bold text-yellow-600">{partialCount}</span>
                           </div>
                           <p className="text-xs font-medium text-gray-900">Partial</p>
-                          <p className="text-xs text-gray-500">Incomplete</p>
                         </div>
                         <div className="text-center">
-                          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-1">
-                            <span className="text-sm font-bold text-red-600">{creditCount}</span>
+                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-1">
+                            <span className="text-xs font-bold text-red-600">{creditCount}</span>
                           </div>
                           <p className="text-xs font-medium text-gray-900">Credit</p>
-                          <p className="text-xs text-gray-500">Outstanding</p>
                         </div>
                       </div>
                     </div>
@@ -782,20 +770,20 @@ export function StudentsPage() {
       <Dialog open={showSuspensionModal} onOpenChange={setShowSuspensionModal}>
         <DialogContent className="max-w-md">
           <DialogHeader className="pb-4">
-            <DialogTitle className="flex items-center gap-3 text-xl font-bold">
+            <DialogTitle className="flex items-center gap-3 text-lg font-bold">
               <div className="p-2 bg-red-100 rounded-lg">
                 <XCircle className="h-5 w-5 text-red-600" />
               </div>
               Suspend Student
             </DialogTitle>
-            <DialogDescription className="text-base leading-relaxed">
+            <DialogDescription className="text-sm leading-relaxed">
               Set suspension period for {selectedStudent?.name} ({selectedStudent?.id})
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Select Suspension Period</Label>
+              <Label className="text-sm font-medium">Suspension Period</Label>
               <Select value={suspensionPeriod} onValueChange={setSuspensionPeriod}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select suspension period" />
@@ -824,7 +812,7 @@ export function StudentsPage() {
               )}
             </div>
             
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-2 pt-2">
               <Button 
                 variant="outline" 
                 onClick={() => {
@@ -832,7 +820,6 @@ export function StudentsPage() {
                   setSuspensionPeriod('1day');
                   setCustomDays('');
                 }}
-                className="px-6"
               >
                 Cancel
               </Button>
@@ -884,10 +871,10 @@ export function StudentsPage() {
                     toast.error('Failed to suspend student');
                   }
                 }}
-                className="bg-red-600 hover:bg-red-700 px-6"
+                className="bg-red-600 hover:bg-red-700"
               >
                 <XCircle className="h-4 w-4 mr-2" />
-                Suspend Student
+                Suspend
               </Button>
             </div>
           </div>

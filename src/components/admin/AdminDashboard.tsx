@@ -382,12 +382,12 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Dashboard Header with Refresh Button */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your student information system</p>
+          <h1 className="text-xl md:text-2xl font-bold">Admin Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Overview of your student information system</p>
         </div>
         <Button 
           variant="outline" 
@@ -396,21 +396,21 @@ export function AdminDashboard() {
           className="flex items-center gap-2"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Students</CardTitle>
             <Users className="h-5 w-5 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStudents}</div>
-            <DottedSeparator className="my-3" />
+            <div className="text-xl md:text-2xl font-bold">{stats.totalStudents}</div>
+            <DottedSeparator className="my-2" />
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-              <span>{stats.activeStudentsToday} active students</span>
+              <span>{stats.activeStudentsToday} active</span>
               <span>{stats.totalStudents > 0 ? Math.round((stats.activeStudentsToday / stats.totalStudents) * 100) : 0}%</span>
             </div>
             <Progress 
@@ -426,10 +426,10 @@ export function AdminDashboard() {
             <PhilippinePeso className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₱{stats.dailyRevenue.toFixed(2)}</div>
-            <DottedSeparator className="my-3" />
-            <div className="space-y-2">
-              <div className={`flex items-center gap-1 text-sm ${
+            <div className="text-xl md:text-2xl font-bold">₱{stats.dailyRevenue.toFixed(2)}</div>
+            <DottedSeparator className="my-2" />
+            <div className="space-y-1">
+              <div className={`flex items-center gap-1 text-xs md:text-sm ${
                 stats.dailyRevenue >= stats.yesterdayRevenue ? 'text-green-600' : 'text-red-600'
               }`}>
                 {stats.dailyRevenue >= stats.yesterdayRevenue ? (
@@ -437,9 +437,9 @@ export function AdminDashboard() {
                 ) : (
                   <TrendingDown className="h-4 w-4" />
                 )}
-                <span>
+                <span className="truncate">
                   {stats.yesterdayRevenue > 0 ? 
-                    `${Math.abs(((stats.dailyRevenue - stats.yesterdayRevenue) / stats.yesterdayRevenue) * 100).toFixed(1)}% from yesterday` :
+                    `${Math.abs(((stats.dailyRevenue - stats.yesterdayRevenue) / stats.yesterdayRevenue) * 100).toFixed(0)}% from yesterday` :
                     '0% from yesterday'
                   }
                 </span>
@@ -454,9 +454,9 @@ export function AdminDashboard() {
             <Target className="h-5 w-5 text-muted-foreground text-violet-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₱{stats.weeklyRevenue.toFixed(2)}</div>
-            <DottedSeparator className="my-3" />
-            <div className={`flex items-center gap-2 text-sm ${
+            <div className="text-xl md:text-2xl font-bold">₱{stats.weeklyRevenue.toFixed(2)}</div>
+            <DottedSeparator className="my-2" />
+            <div className={`flex items-center gap-1 text-xs md:text-sm ${
               stats.weeklyRevenue >= stats.lastWeekRevenue ? 'text-green-600' : 'text-red-600'
             }`}>
               {stats.weeklyRevenue >= stats.lastWeekRevenue ? (
@@ -464,9 +464,9 @@ export function AdminDashboard() {
               ) : (
                 <TrendingDown className="h-4 w-4" />
               )}
-              <span>
+              <span className="truncate">
                 {stats.lastWeekRevenue > 0 ? 
-                  `${Math.abs(((stats.weeklyRevenue - stats.lastWeekRevenue) / stats.lastWeekRevenue) * 100).toFixed(1)}% from last week` :
+                  `${Math.abs(((stats.weeklyRevenue - stats.lastWeekRevenue) / stats.lastWeekRevenue) * 100).toFixed(0)}% from last week` :
                   '0% from last week'
                 }
               </span>
@@ -476,13 +476,13 @@ export function AdminDashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
+            <CardTitle className="text-sm font-medium">Transactions</CardTitle>
             <ShoppingCart className="h-5 w-5 text-muted-foreground text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalTransactions}</div>
-            <DottedSeparator className="my-3" />
-            <div className={`flex items-center gap-2 text-sm ${
+            <div className="text-xl md:text-2xl font-bold">{stats.totalTransactions}</div>
+            <DottedSeparator className="my-2" />
+            <div className={`flex items-center gap-1 text-xs md:text-sm ${
               stats.dailyTransactions >= stats.yesterdayTransactions ? 'text-green-600' : 'text-red-600'
             }`}>
               {stats.dailyTransactions >= stats.yesterdayTransactions ? (
@@ -490,9 +490,9 @@ export function AdminDashboard() {
               ) : (
                 <TrendingDown className="h-4 w-4" />
               )}
-              <span>
+              <span className="truncate">
                 {stats.yesterdayTransactions > 0 ? 
-                  `${Math.abs(((stats.dailyTransactions - stats.yesterdayTransactions) / stats.yesterdayTransactions) * 100).toFixed(1)}% from yesterday` :
+                  `${Math.abs(((stats.dailyTransactions - stats.yesterdayTransactions) / stats.yesterdayTransactions) * 100).toFixed(0)}% from yesterday` :
                   '0% from yesterday'
                 }
               </span>
@@ -501,15 +501,15 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Revenue Trend */}
         <Card>
-          <CardHeader className='bg-primary rounded-t-lg mb-4'>
-            <CardTitle className='font-bold text-white'>Revenue Trend</CardTitle>
-            <CardDescription className='text-white'>Daily revenue for the past week</CardDescription>
+          <CardHeader className='bg-primary rounded-t-lg mb-2 p-4'>
+            <CardTitle className='font-bold text-white text-base'>Revenue Trend</CardTitle>
+            <CardDescription className='text-white text-xs'>Daily revenue for the past week</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350} className='text-xs'>
+          <CardContent className="p-2">
+            <ResponsiveContainer width="100%" height={250} className='text-xs'>
               <LineChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -523,21 +523,21 @@ export function AdminDashboard() {
 
         {/* Transactions by Course */}
         <Card>
-          <CardHeader className='bg-primary rounded-t-lg mb-4'>
-            <CardTitle className='font-bold text-white'>Transactions by Course</CardTitle>
-            <CardDescription className='text-white'>Breakdown of transactions by student course</CardDescription>
+          <CardHeader className='bg-primary rounded-t-lg mb-2 p-4'>
+            <CardTitle className='font-bold text-white text-base'>Transactions by Course</CardTitle>
+            <CardDescription className='text-white text-xs'>Breakdown of transactions by student course</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-center">
-              <div className="relative w-64 h-64">
+          <CardContent className="p-2">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+              <div className="relative w-48 h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={courseData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={120}
+                      innerRadius={40}
+                      outerRadius={80}
                       paddingAngle={5}
                       dataKey="purchases"
                     >
@@ -549,54 +549,51 @@ export function AdminDashboard() {
                   </PieChart>
                 </ResponsiveContainer>
                 
-                {/* Center text overlay */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-foreground">
+                    <div className="text-2xl font-bold text-foreground">
                       {stats.totalTransactions}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Total Transactions
+                      Total
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Legend */}
-            <div className="mt-6 space-y-2">
-              {courseData.map((entry, index) => (
-                <div key={entry.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <span className="text-sm font-medium">{entry.name}</span>
+              <div className="mt-4 md:mt-0 space-y-2 w-full md:w-auto">
+                {courseData.map((entry, index) => (
+                  <div key={entry.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      <span className="font-medium">{entry.name}</span>
+                    </div>
+                    <span className="text-muted-foreground">
+                      {entry.purchases} ({entry.percentage}%)
+                    </span>
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    {entry.purchases} ({entry.percentage}%)
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Additional Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Peak Hours */}
         <Card className="py-0">
           <CardHeader className="flex flex-col border-b items-stretch !p-0 sm:flex-row">
-            <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:!py-0">
-              <CardTitle>Peak Transaction Hours</CardTitle>
-              <CardDescription>Transaction volume throughout the day</CardDescription>
+            <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-3 sm:!py-0">
+              <CardTitle className="text-base">Peak Transaction Hours</CardTitle>
+              <CardDescription className="text-xs">Transaction volume throughout the day</CardDescription>
             </div>
             <div className="flex">
-              <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left sm:border-t-0 sm:px-8 sm:py-6 bg-muted/50">
+              <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-4 py-3 text-left sm:border-t-0 sm:px-6 sm:py-4 bg-muted/50">
                 <span className="text-muted-foreground text-xs">Peak Hour</span>
-                <span className="text-lg leading-none font-bold sm:text-3xl text-primary">
+                <span className="text-lg leading-none font-bold sm:text-2xl text-primary">
                 {peakHoursData.length > 0 ? 
                   peakHoursData.find(item => item.transactions === Math.max(...peakHoursData.map(h => h.transactions)))?.time || '' 
                   : ''
@@ -605,12 +602,12 @@ export function AdminDashboard() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="px-2 sm:p-6">
-            <ResponsiveContainer width="100%" height={250}>
+          <CardContent className="px-2 sm:p-4">
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart
                 data={peakHoursData}
                 margin={{
-                  left: 12,
+                  left: 0,
                   right: 12,
                 }}
               >
@@ -621,11 +618,13 @@ export function AdminDashboard() {
                   axisLine={false}
                   tickMargin={8}
                   minTickGap={32}
+                  tick={{ fontSize: 10 }}
                 />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
+                  tick={{ fontSize: 10 }}
                 />
                 <Tooltip 
                   formatter={(value) => [value, 'Transactions']}
@@ -650,45 +649,45 @@ export function AdminDashboard() {
         {/* Recent Sales */}
         <Card className="py-0">
           <CardHeader className="flex flex-col border-b items-stretch !p-0 sm:flex-row">
-            <div className="flex flex-1 flex-col justify-center gap-1 px-6 pt-4 pb-3 sm:!py-0">
-              <CardTitle>Recent Sales</CardTitle>
-              <CardDescription>Latest transactions</CardDescription>
+            <div className="flex flex-1 flex-col justify-center gap-1 px-4 py-3 sm:!py-0">
+              <CardTitle className="text-base">Recent Sales</CardTitle>
+              <CardDescription className="text-xs">Latest transactions</CardDescription>
             </div>
             <div className="flex">
-              <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-6 py-4 text-left sm:border-t-0 sm:px-8 sm:py-6 bg-muted/50">
+              <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-4 py-3 text-left sm:border-t-0 sm:px-6 sm:py-4 bg-muted/50">
                 <span className="text-muted-foreground text-xs">Today's Sales</span>
-                <span className="text-lg leading-none font-bold sm:text-3xl text-primary">
+                <span className="text-lg leading-none font-bold sm:text-2xl text-primary">
                   {stats.dailyTransactions}
                 </span>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="px-2 sm:p-6">
-            <div className="space-y-4">
+          <CardContent className="px-2 sm:p-4">
+            <div className="space-y-3">
               {recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-primary/10 rounded-full">
-                      <ShoppingCart className="h-4 w-4 text-primary" />
+                <div key={sale.id} className="flex items-center justify-between p-2 border rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1.5 bg-primary/10 rounded-full">
+                      <ShoppingCart className="h-3.5 w-3.5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium">{sale.name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-medium text-sm">{sale.name}</p>
+                      <p className="text-xs text-muted-foreground">
                         {sale.studentId} • {sale.course}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold">₱{sale.amount.toFixed(2)}</p>
+                    <p className="font-semibold text-sm">₱{sale.amount.toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">{sale.time}</p>
                   </div>
                 </div>
               ))}
               
               {recentSales.length === 0 && (
-                <div className="text-center py-8">
-                  <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No recent transactions</p>
+                <div className="text-center py-6">
+                  <ShoppingCart className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">No recent transactions</p>
                 </div>
               )}
             </div>
@@ -697,22 +696,22 @@ export function AdminDashboard() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4">
             <CardTitle className="text-sm">Average Transaction</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₱{stats.averageTransaction.toFixed(2)}</div>
-            <Progress value={Math.min((stats.averageTransaction / 200) * 100, 100)} className="mt-2" />
-            <p className="text-xs text-muted-foreground mt-2">
+          <CardContent className="p-4 pt-0">
+            <div className="text-xl md:text-2xl font-bold">₱{stats.averageTransaction.toFixed(2)}</div>
+            <Progress value={Math.min((stats.averageTransaction / 200) * 100, 100)} className="mt-2 h-1.5" />
+            <p className="text-xs text-muted-foreground mt-1">
               Per transaction average
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
             <CardTitle className="text-sm">This Month</CardTitle>
             <Dialog open={showTargetDialog} onOpenChange={setShowTargetDialog}>
               <DialogTrigger asChild>
@@ -751,32 +750,32 @@ export function AdminDashboard() {
               </DialogContent>
             </Dialog>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₱{stats.monthlyRevenue.toFixed(2)}</div>
-            <Progress value={Math.min((stats.monthlyRevenue / monthlyTarget) * 100, 100)} className="mt-2" />
-            <p className="text-xs text-muted-foreground mt-2">
+          <CardContent className="p-4 pt-0">
+            <div className="text-xl md:text-2xl font-bold">₱{stats.monthlyRevenue.toFixed(2)}</div>
+            <Progress value={Math.min((stats.monthlyRevenue / monthlyTarget) * 100, 100)} className="mt-2 h-1.5" />
+            <p className="text-xs text-muted-foreground mt-1">
               Target: ₱{monthlyTarget.toFixed(2)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4">
             <CardTitle className="text-sm">System Status</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0">
             <div className="flex items-center space-x-2">
               {isMaintenance ? (
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
               ) : (
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
               )}
               <span className="text-sm font-medium">
-                {isMaintenance ? 'Maintenance Mode Active' : 'All Systems Operational'}
+                {isMaintenance ? 'Maintenance Active' : 'Operational'}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {isMaintenance ? 'Application is in maintenance mode. Some features may be unavailable.' : 'Database, authentication, and services running normally'}
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              {isMaintenance ? 'System is in maintenance mode.' : 'All systems running normally.'}
             </p>
           </CardContent>
         </Card>

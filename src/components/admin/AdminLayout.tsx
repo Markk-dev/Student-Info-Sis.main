@@ -61,14 +61,14 @@ function AdminSidebar({ currentPage, setCurrentPage, adminData }: { currentPage:
   const { isOpen } = useSidebar();
 
   return (
-    <Sidebar className={`w-64 border-r bg-card transition-all duration-300 fixed md:relative z-50 h-full ${!isOpen ? 'hidden md:flex' : 'flex'}`}>
+    <Sidebar className={`w-60 md:w-64 border-r bg-card transition-all duration-300 fixed lg:relative z-50 h-full ${!isOpen ? 'hidden lg:flex' : 'flex'}`}>
       <SidebarHeader className="flex-col px-2 py-2 -mt-2.5 bg-background">
         <div className="flex items-center gap-2 mb-4">
-          <div className="bg-primary rounded-lg w-9 h-9 flex items-center justify-center">
-            <QrCode className="h-6 w-6 text-primary-foreground" />
+          <div className="bg-primary rounded-lg w-8 h-8 md:w-9 md:h-9 flex items-center justify-center">
+            <QrCode className="h-5 w-5 md:h-6 md:w-6 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-lg">Canteen System</span>
+            <span className="font-semibold text-base md:text-lg">Canteen System</span>
             <span className="text-sm text-muted-foreground">Admin Panel</span>
           </div>
         </div>
@@ -82,7 +82,7 @@ function AdminSidebar({ currentPage, setCurrentPage, adminData }: { currentPage:
               <SidebarMenuButton
                 onClick={() => setCurrentPage(item.page)}
                 isActive={currentPage === item.page}
-                className="w-full justify-start gap-3 px-3 py-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="w-full justify-start gap-3 px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <item.icon className="h-5 w-5" />
                 <span>{item.title}</span>
@@ -168,7 +168,7 @@ function AdminLayout({ adminData }: AdminLayoutProps) {
   // Auto-close sidebar on small screens when page changes
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
+      if (window.innerWidth < 1024) {
         setIsOpen(false);
       }
     };
@@ -182,7 +182,7 @@ function AdminLayout({ adminData }: AdminLayoutProps) {
   const handlePageChange = (page: NavPage) => {
     setCurrentPage(page);
     // Auto-close sidebar on mobile after navigation
-    if (window.innerWidth < 768) {
+    if (window.innerWidth < 1024) {
       setIsOpen(false);
     }
   };
@@ -194,7 +194,7 @@ function AdminLayout({ adminData }: AdminLayoutProps) {
       {/* Mobile Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -202,21 +202,21 @@ function AdminLayout({ adminData }: AdminLayoutProps) {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header with Toggle Button */}
-        <header className="flex items-center justify-between px-4 py-3 border-b bg-background md:hidden">
+        <header className="flex items-center justify-between px-4 py-2 border-b bg-background lg:hidden">
           <div className="flex items-center gap-3">
             <SidebarToggle onClick={() => setIsOpen(!isOpen)} />
             <div>
-              <h1 className="text-lg font-semibold">{getPageTitle()}</h1>
+              <h1 className="text-base font-semibold">{getPageTitle()}</h1>
               <p className="text-sm text-muted-foreground">{getPageDescription()}</p>
             </div>
           </div>
         </header>
 
         {/* Desktop Header */}
-        <header className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mb-1 hidden md:block">
-          <div className="flex h-16 items-center gap-4 px-6">
+        <header className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 mb-1 hidden lg:block">
+          <div className="flex h-16 items-center gap-4 px-4">
             <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-bold text-foreground">{getPageTitle()}</h1>
+              <h1 className="text-xl font-bold text-foreground">{getPageTitle()}</h1>
               <p className="text-sm text-muted-foreground">{getPageDescription()}</p>
             </div>
             <div className="flex-1" />
@@ -230,10 +230,10 @@ function AdminLayout({ adminData }: AdminLayoutProps) {
             </div>
           </div>
         </header>
-        <LineSeparator className="hidden md:block" />
+        <LineSeparator className="hidden lg:block" />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-6 bg-background">
+        <main className="flex-1 overflow-auto p-2 sm:p-4 md:p-6 bg-background">
           <div className="max-w-7xl mx-auto">
             {renderPage()}
           </div>
