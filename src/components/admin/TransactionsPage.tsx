@@ -432,7 +432,13 @@ export function TransactionsPage() {
       
       console.log('Refreshed transaction data:', transformedTransactions.find(t => t.id === editingTransaction.id));
       
-      setTransactions(transformedTransactions);
+      // Ensure newest transactions appear first
+      const sortedTransactions = transformedTransactions.sort((a, b) => {
+        const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return b.id.localeCompare(a.id);
+      });
+      setTransactions(sortedTransactions);
       setEditingTransaction(null);
       setPaymentAmount('');
       
@@ -496,7 +502,13 @@ export function TransactionsPage() {
         };
       });
       
-      setTransactions(transformedTransactions);
+      // Ensure newest transactions appear first
+      const sortedTransactions = transformedTransactions.sort((a, b) => {
+        const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return b.id.localeCompare(a.id);
+      });
+      setTransactions(sortedTransactions);
       setDeletingTransaction(null);
       toast.success('Transaction deleted successfully');
     } catch (error) {
@@ -949,42 +961,29 @@ export function TransactionsPage() {
               </div>
             </div>
 
-            {/* Outstanding Balances */}
+            {/* Outstanding Balance for this Transaction only */}
             {selectedTransaction && (
               <div className="bg-white border border-gray-200 rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Student Outstanding Balances</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Outstanding Balance</h3>
                   <div className="text-sm text-gray-500">
                     {(() => {
-                      const studentTransactions = transactions.filter(t => t.studentId === selectedTransaction.studentId);
-                      const outstandingCount = studentTransactions.filter(t => {
-                        // Only count transactions with actual outstanding balances
-                        if (t.status === 'Credit') {
-                          return true; // Credit transactions always have outstanding balance
-                        } else if (t.status === 'Partial') {
-                          return t.amount < 0; // Partial transactions with negative amount (remaining balance)
-                        }
-                        return false; // Paid transactions have no outstanding balance
-                      }).length;
-                      return `${outstandingCount} ${outstandingCount === 1 ? 'balance' : 'balances'}`;
+                      const hasOutstanding =
+                        selectedTransaction.status === 'Credit' ||
+                        (selectedTransaction.status === 'Partial' && selectedTransaction.amount < 0);
+                      const count = hasOutstanding ? 1 : 0;
+                      return `${count} ${count === 1 ? 'balance' : 'balances'}`;
                     })()}
                   </div>
                 </div>
                 
                 <div className="space-y-3">
                   {(() => {
-                    const studentTransactions = transactions.filter(t => t.studentId === selectedTransaction.studentId);
-                    const outstandingTransactions = studentTransactions.filter(t => {
-                      // Only show transactions with actual outstanding balances
-                      if (t.status === 'Credit') {
-                        return true; // Credit transactions always have outstanding balance
-                      } else if (t.status === 'Partial') {
-                        return t.amount < 0; // Partial transactions with negative amount (remaining balance)
-                      }
-                      return false; // Paid transactions have no outstanding balance
-                    });
+                    const showThis =
+                      selectedTransaction.status === 'Credit' ||
+                      (selectedTransaction.status === 'Partial' && selectedTransaction.amount < 0);
                     
-                    if (outstandingTransactions.length === 0) {
+                    if (!showThis) {
                       return (
                         <div className="text-center py-8">
                           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -992,14 +991,15 @@ export function TransactionsPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                           </div>
-                          <h4 className="text-lg font-medium text-gray-900 mb-2">No Outstanding Balances</h4>
-                          <p className="text-gray-600">This student has no pending payments or loans.</p>
+                          <h4 className="text-lg font-medium text-gray-900 mb-2">No Outstanding Balance</h4>
+                          <p className="text-gray-600">This transaction has no pending balance.</p>
                         </div>
                       );
                     }
                     
-                    return outstandingTransactions.map((txn) => (
-                      <div key={txn.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                    const txn = selectedTransaction;
+                    return (
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
                         <div className="flex items-center space-x-4">
                           <div className={`w-3 h-3 rounded-full ${
                             txn.status === 'Credit' ? 'bg-red-500' : 'bg-yellow-500'
@@ -1027,7 +1027,7 @@ export function TransactionsPage() {
                           </p>
                         </div>
                       </div>
-                    ));
+                    );
                   })()}
                 </div>
               </div>
