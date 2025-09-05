@@ -228,7 +228,30 @@ export function AdminDashboard() {
           }, 0);
 
         
-        const activeStudents = students.filter((student: any) => student.isActive === true).length;
+        // Active students count - using same logic as StudentsPage
+        const activeStudents = students.filter((student: any) => {
+          if (!student.isActive) {
+            return false; // Suspended students are not active
+          }
+          
+          // Check if student has made at least 3 transactions in the past 3 days
+          const threeDaysAgo = new Date();
+          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+          
+          const studentTransactions = transformedTransactions.filter((txn: any) => 
+            txn.studentId === student.studentId
+          );
+          
+          const recentTransactions = studentTransactions.filter((txn: any) => {
+            try {
+              return txn.timestamp && !isNaN(txn.timestamp.getTime()) && txn.timestamp >= threeDaysAgo;
+            } catch (error) {
+              return false;
+            }
+          });
+          
+          return recentTransactions.length >= 3;
+        }).length;
 
         setStats({
           totalStudents,

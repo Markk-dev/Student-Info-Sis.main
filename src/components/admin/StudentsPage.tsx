@@ -394,12 +394,29 @@ export function StudentsPage() {
   }, [students, searchTerm, courseFilter, statusFilter, yearFilter]);
 
   const handleAddStudent = async () => {
+    console.log('Form data:', newStudentData); // Debug log
+    
     if (!newStudentData.studentId || !newStudentData.firstName || !newStudentData.lastName || !newStudentData.course || !newStudentData.yearLevel) {
+      console.log('Missing fields:', {
+        studentId: !newStudentData.studentId,
+        firstName: !newStudentData.firstName,
+        lastName: !newStudentData.lastName,
+        course: !newStudentData.course,
+        yearLevel: !newStudentData.yearLevel
+      }); // Debug log
       toast.error('Please fill in all required fields');
       return;
     }
 
     try {
+      console.log('Calling createStudent with:', {
+        id: newStudentData.studentId,
+        name: `${newStudentData.firstName} ${newStudentData.lastName}`,
+        course: newStudentData.course,
+        yearLevel: newStudentData.yearLevel,
+        isRegistered: true
+      }); // Debug log
+      
       await studentService.createStudent({
         id: newStudentData.studentId,
         name: `${newStudentData.firstName} ${newStudentData.lastName}`,

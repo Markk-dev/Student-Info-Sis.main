@@ -51,6 +51,7 @@ export const authService = {
           course: studentData.course,
           yearLevel: studentData.yearLevel,
           balance: 0,
+          loyalty: 50, // Automatic 50 loyalty points for new students
           isActive: true
         }
       );
@@ -181,11 +182,11 @@ export const studentService = {
   async getStudentById(studentId: string) {
     try {
       const students = await databases.listDocuments(
-        DATABASE_ID, 
+        DATABASE_ID,
         COLLECTIONS.STUDENTS,
         [Query.equal('studentId', studentId)]
       );
-      
+
       if (students.documents.length > 0) {
         const student = students.documents[0] as unknown as Student;
         return {
@@ -225,7 +226,7 @@ export const studentService = {
 
       const [firstName, ...lastNameParts] = data.name.split(' ');
       const lastName = lastNameParts.join(' ') || 'Unknown';
-      
+
       const studentData = {
         studentId: data.id,
         firstName: firstName,
@@ -235,8 +236,11 @@ export const studentService = {
         course: data.course,
         yearLevel: data.yearLevel,
         balance: 0,
+        loyalty: 50, // Automatic 50 loyalty points for new students
         isActive: true
       };
+
+      console.log('Creating student with data:', studentData); // Debug log
 
       const createdStudent = await databases.createDocument(
         DATABASE_ID,
@@ -244,6 +248,8 @@ export const studentService = {
         ID.unique(),
         studentData
       );
+
+      console.log('Student created successfully:', createdStudent); // Debug log
 
       return {
         id: createdStudent.studentId,
@@ -255,6 +261,7 @@ export const studentService = {
       };
     } catch (error) {
       console.error('Create student error:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error)); // More detailed error logging
       throw error;
     }
   },
@@ -263,17 +270,17 @@ export const studentService = {
     try {
       // First, find the student by studentId to get the Appwrite document $id
       const students = await databases.listDocuments(
-        DATABASE_ID, 
+        DATABASE_ID,
         COLLECTIONS.STUDENTS,
         [Query.equal('studentId', studentId)]
       );
-      
+
       if (students.documents.length === 0) {
         throw new Error('Student not found');
       }
-      
+
       const student = students.documents[0];
-      
+
       // Now update using the Appwrite document $id
       return await databases.updateDocument(DATABASE_ID, COLLECTIONS.STUDENTS, student.$id, data);
     } catch (error) {
@@ -296,11 +303,11 @@ export const studentService = {
     try {
       const students = await this.getStudents();
       const now = new Date();
-      
+
       for (const student of students.documents) {
         if (student.suspensionDate && student.isActive === false) {
           const suspensionEnd = new Date(student.suspensionDate);
-          
+
           // If suspension period has ended, reactivate the student
           if (now > suspensionEnd) {
             await this.updateStudent(student.studentId, {
@@ -496,7 +503,7 @@ export const settingsService = {
   async updateSettings(data: Partial<Settings>) {
     try {
       const settings = await this.getSettings();
-      
+
       if (settings.$id) {
         // Update existing settings
         return await databases.updateDocument(DATABASE_ID, COLLECTIONS.SETTINGS, settings.$id, data);

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Download, Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
+import { Download, Plus, Search, Filter, Eye, Edit, Trash2, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { transactionService, studentService } from '@/lib/services';
 import { format as formatDateFns } from 'date-fns';
@@ -38,10 +38,7 @@ export function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: undefined,
-    to: undefined
-  });
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -51,33 +48,33 @@ export function TransactionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
 
-  
+
   useEffect(() => {
     const loadTransactions = async () => {
       try {
         setLoading(true);
         const transactionsResponse = await transactionService.getTransactions();
-        
+
         const studentsResponse = await studentService.getStudents();
-        
-        
+
+
         const studentsMap = new Map();
         studentsResponse.documents.forEach((student: any) => {
           studentsMap.set(student.studentId, student);
         });
-        
-        
+
+
         const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
           const student = studentsMap.get(txn.studentId);
-          
-          
+
+
           let timestamp: Date;
           try {
             // Appwrite stores timestamps in ISO format, parse directly
             timestamp = new Date(txn.$createdAt || txn.createdAt);
             if (isNaN(timestamp.getTime())) {
               console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
-              timestamp = new Date(); 
+              timestamp = new Date();
             } else {
               // Debug log for successful timestamp parsing
               console.log(`Successfully parsed timestamp for ${txn.$id}:`, {
@@ -88,9 +85,9 @@ export function TransactionsPage() {
             }
           } catch (error) {
             console.warn('Error parsing timestamp for transaction:', txn.$id, error);
-            timestamp = new Date(); 
+            timestamp = new Date();
           }
-          
+
           return {
             id: txn.$id,
             studentId: txn.studentId,
@@ -105,7 +102,7 @@ export function TransactionsPage() {
             status: txn.status || 'completed',
           };
         });
-        
+
         // Sort by latest first (newest transactions at the top), then by ID as fallback
         const sortedTransactions = transformedTransactions.sort((a, b) => {
           const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
@@ -113,7 +110,7 @@ export function TransactionsPage() {
           // If timestamps are the same, sort by ID (newer IDs come first)
           return b.id.localeCompare(a.id);
         });
-        
+
         setTransactions(sortedTransactions);
       } catch (error) {
         toast.error('Failed to load transactions');
@@ -125,32 +122,34 @@ export function TransactionsPage() {
     loadTransactions();
   }, []);
 
-  
+
   const courses = useMemo(() => {
     const uniqueCourses = [...new Set(transactions.map(t => t.course))];
     return uniqueCourses.sort();
   }, [transactions]);
 
-  
+
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
-      const matchesSearch = 
+      const matchesSearch =
         transaction.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         transaction.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
         transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesCourse = courseFilter === 'all' || transaction.course === courseFilter;
       const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
-      
-      const matchesDateRange = !dateRange.from || !dateRange.to || 
-        (transaction.timestamp && !isNaN(transaction.timestamp.getTime()) &&
-         dateRange.from && !isNaN(dateRange.from.getTime()) &&
-         dateRange.to && !isNaN(dateRange.to.getTime()) &&
-         transaction.timestamp >= dateRange.from && transaction.timestamp <= dateRange.to);
 
-      return matchesSearch && matchesCourse && matchesStatus && matchesDateRange;
+      const matchesDateFilter = selectedDates.length === 0 ||
+        (transaction.timestamp && !isNaN(transaction.timestamp.getTime()) &&
+          selectedDates.some(selectedDate => {
+            const txnDate = new Date(transaction.timestamp);
+            const selectedDateOnly = new Date(selectedDate);
+            return txnDate.toDateString() === selectedDateOnly.toDateString();
+          }));
+
+      return matchesSearch && matchesCourse && matchesStatus && matchesDateFilter;
     });
-  }, [transactions, searchTerm, courseFilter, statusFilter, dateRange]);
+  }, [transactions, searchTerm, courseFilter, statusFilter, selectedDates]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
@@ -161,7 +160,7 @@ export function TransactionsPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, courseFilter, statusFilter, dateRange]);
+  }, [searchTerm, courseFilter, statusFilter, selectedDates]);
 
   const getStatusBadge = (status: Transaction['status']) => {
     const config = {
@@ -211,7 +210,7 @@ export function TransactionsPage() {
   // };
 
   const exportCSV = () => {
-    
+
     const headers = ['Transaction Number', 'Student ID', 'Student Name', 'Course', 'Amount', 'Date & Time', 'Cashier', 'Status'];
     const csvContent = [
       headers.join(','),
@@ -228,7 +227,7 @@ export function TransactionsPage() {
       ].join(','))
     ].join('\n');
 
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -236,13 +235,13 @@ export function TransactionsPage() {
     a.download = `transactions_${formatDateFns(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-    
+
     toast.success('CSV exported successfully');
   };
 
   const handleNewTransaction = async (transactionData: any) => {
     try {
-      
+
       // Calculate amount based on transaction status
       let amount: number;
       if (transactionData.status === 'Credit') {
@@ -256,6 +255,55 @@ export function TransactionsPage() {
         amount = transactionData.totalItemAmount;
       }
 
+      // Calculate loyalty points based on totalItemAmount
+      const calculateLoyaltyPoints = (totalAmount: number): number => {
+        if (totalAmount >= 100) return 3;
+        if (totalAmount >= 60) return 2;
+        if (totalAmount >= 25) return 1;
+        return 0;
+      };
+
+      // Only award loyalty points for fully paid transactions
+      let actualLoyaltyPointsEarned = 0;
+      let loyaltyPointsEarned = 0;
+      let remainingDailyPoints = 0;
+
+      if (transactionData.status === 'Paid') {
+        loyaltyPointsEarned = calculateLoyaltyPoints(transactionData.totalItemAmount);
+
+        // Get current student data to check daily loyalty points
+        const currentStudentsResponse = await studentService.getStudents();
+        const student = currentStudentsResponse.documents.find((s: any) => s.studentId === transactionData.studentId);
+
+        if (!student) {
+          throw new Error('Student not found');
+        }
+
+        // Check today's transactions to calculate daily loyalty points earned
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+        const todayTransactionsResponse = await transactionService.getTransactions();
+        const todayTransactions = todayTransactionsResponse.documents.filter((txn: any) => {
+          const txnDate = new Date(txn.$createdAt || txn.createdAt);
+          return txnDate >= todayStart && txnDate < todayEnd && txn.studentId === transactionData.studentId && txn.status === 'Paid';
+        });
+
+        // Calculate total loyalty points earned today (before this transaction) - only from paid transactions
+        let dailyLoyaltyEarned = 0;
+        todayTransactions.forEach((txn: any) => {
+          const txnAmount = txn.totalItemAmount || 0;
+          dailyLoyaltyEarned += calculateLoyaltyPoints(txnAmount);
+        });
+
+        // Apply daily cap of 3 points
+        const DAILY_LOYALTY_CAP = 3;
+        remainingDailyPoints = Math.max(0, DAILY_LOYALTY_CAP - dailyLoyaltyEarned);
+        actualLoyaltyPointsEarned = Math.min(loyaltyPointsEarned, remainingDailyPoints);
+      }
+
+      // Create the transaction
       await transactionService.createTransaction({
         studentId: transactionData.studentId,
         amount: amount, // Calculated based on status
@@ -263,37 +311,50 @@ export function TransactionsPage() {
         totalItemAmount: transactionData.totalItemAmount, // Always positive - actual item value
         itemPrices: JSON.stringify(transactionData.itemPrices || []), // Store as JSON string
         status: transactionData.status, // Paid/Partial/Credit
-        cashierId: 'admin_002', 
+        cashierId: 'admin_002',
       });
 
-      
+      // Update student's loyalty points if any were earned (only for paid transactions)
+      if (transactionData.status === 'Paid' && actualLoyaltyPointsEarned > 0) {
+        const currentStudentsResponse2 = await studentService.getStudents();
+        const student = currentStudentsResponse2.documents.find((s: any) => s.studentId === transactionData.studentId);
+
+        if (student) {
+          const newLoyaltyPoints = Math.min(100, (student.loyalty || 0) + actualLoyaltyPointsEarned); // Cap at 100
+          await studentService.updateStudent(transactionData.studentId, {
+            loyalty: newLoyaltyPoints
+          });
+        }
+      }
+
+
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
-      
-      
+
+
       const studentsMap = new Map();
       studentsResponse.documents.forEach((student: any) => {
         studentsMap.set(student.studentId, student);
       });
-      
-      
+
+
       const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
         const student = studentsMap.get(txn.studentId);
-        
-        
+
+
         let timestamp: Date;
         try {
           // Appwrite stores timestamps in ISO format, parse directly
           timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
             console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
-            timestamp = new Date(); 
+            timestamp = new Date();
           }
         } catch (error) {
           console.warn('Error parsing timestamp for transaction:', txn.$id, error);
-          timestamp = new Date(); 
+          timestamp = new Date();
         }
-        
+
         return {
           id: txn.$id,
           studentId: txn.studentId,
@@ -308,7 +369,7 @@ export function TransactionsPage() {
           status: txn.status || 'completed',
         };
       });
-      
+
       // Sort by latest first (newest transactions at the top), then by ID as fallback
       const sortedTransactions = transformedTransactions.sort((a, b) => {
         const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
@@ -316,17 +377,23 @@ export function TransactionsPage() {
         // If timestamps are the same, sort by ID (newer IDs come first)
         return b.id.localeCompare(a.id);
       });
-      
+
       setTransactions(sortedTransactions);
       setShowBarcodeScanner(false);
-      
-      // Show appropriate success message
+
+      // Show appropriate success message with loyalty points info
       if (transactionData.status === 'Credit') {
-        toast.success(`Credit transaction processed: ₱${transactionData.amount.toFixed(2)} Credit recorded`);
+        toast.success(`Credit transaction processed: ₱${transactionData.totalItemAmount.toFixed(2)} Credit recorded`);
       } else {
-        toast.success(`Transaction processed: ₱${transactionData.amount.toFixed(2)}`);
+        let message = `Transaction processed: ₱${transactionData.totalItemAmount.toFixed(2)}`;
+        if (actualLoyaltyPointsEarned > 0) {
+          message += ` • +${actualLoyaltyPointsEarned} loyalty point${actualLoyaltyPointsEarned > 1 ? 's' : ''}`;
+        } else if (loyaltyPointsEarned > 0 && remainingDailyPoints === 0) {
+          message += ` • Daily loyalty limit reached (3 pts)`;
+        }
+        toast.success(message);
       }
-      
+
       // Dispatch event to notify dashboard of new transaction
       console.log('Dispatching transactionCreated event');
       window.dispatchEvent(new CustomEvent('transactionCreated'));
@@ -342,7 +409,7 @@ export function TransactionsPage() {
 
     try {
       setIsProcessingPayment(true);
-      
+
       const payment = parseFloat(paymentAmount);
       if (isNaN(payment) || payment <= 0) {
         toast.error('Please enter a valid payment amount');
@@ -359,7 +426,7 @@ export function TransactionsPage() {
         toast.error(`Payment amount cannot exceed outstanding balance of ₱${remainingBalance.toFixed(2)}`);
         return;
       }
-      
+
       let newTransactionAmount: number;
       let newAmount: number;
       let newStatus: 'Paid' | 'Partial' | 'Credit';
@@ -394,27 +461,27 @@ export function TransactionsPage() {
       // Refresh data
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
-      
+
       const studentsMap = new Map();
       studentsResponse.documents.forEach((student: any) => {
         studentsMap.set(student.studentId, student);
       });
-      
+
       const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
         const student = studentsMap.get(txn.studentId);
-        
+
         let timestamp: Date;
         try {
           timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
             console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
-            timestamp = new Date(); 
+            timestamp = new Date();
           }
         } catch (error) {
           console.warn('Error parsing timestamp for transaction:', txn.$id, error);
-          timestamp = new Date(); 
+          timestamp = new Date();
         }
-        
+
         return {
           id: txn.$id,
           studentId: txn.studentId,
@@ -429,9 +496,9 @@ export function TransactionsPage() {
           status: txn.status || 'completed',
         };
       });
-      
+
       console.log('Refreshed transaction data:', transformedTransactions.find(t => t.id === editingTransaction.id));
-      
+
       // Ensure newest transactions appear first
       const sortedTransactions = transformedTransactions.sort((a, b) => {
         const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
@@ -441,13 +508,13 @@ export function TransactionsPage() {
       setTransactions(sortedTransactions);
       setEditingTransaction(null);
       setPaymentAmount('');
-      
+
       if (newStatus === 'Paid') {
         toast.success('Payment completed! Transaction is now fully paid.');
       } else {
         toast.success(`Partial payment of ₱${payment.toFixed(2)} processed. Remaining balance: ₱${Math.abs(newAmount).toFixed(2)}`);
       }
-      
+
       // Dispatch event to notify students page of transaction update
       window.dispatchEvent(new CustomEvent('transactionUpdated'));
     } catch (error) {
@@ -462,37 +529,37 @@ export function TransactionsPage() {
     if (!deletingTransaction) return;
 
     try {
-      
+
       await transactionService.deleteTransaction(deletingTransaction.id);
 
-      
+
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
-      
-      
+
+
       const studentsMap = new Map();
       studentsResponse.documents.forEach((student: any) => {
         studentsMap.set(student.studentId, student);
       });
-      
-      
+
+
       const transformedTransactions: Transaction[] = transactionsResponse.documents.map((txn: any) => {
         const student = studentsMap.get(txn.studentId);
-        
-        
+
+
         let timestamp: Date;
         try {
           // Appwrite stores timestamps in ISO format, parse directly
           timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
             console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
-            timestamp = new Date(); 
+            timestamp = new Date();
           }
         } catch (error) {
           console.warn('Error parsing timestamp for transaction:', txn.$id, error);
-          timestamp = new Date(); 
+          timestamp = new Date();
         }
-        
+
         return {
           id: txn.$id,
           studentId: txn.studentId,
@@ -504,7 +571,7 @@ export function TransactionsPage() {
           status: txn.status || 'completed',
         };
       });
-      
+
       // Ensure newest transactions appear first
       const sortedTransactions = transformedTransactions.sort((a, b) => {
         const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
@@ -541,7 +608,7 @@ export function TransactionsPage() {
         </Button>
         <Button onClick={() => setShowBarcodeScanner(true)}>
           <Plus className="h-4 w-4 mr-2" />
-           New Transaction
+          New Transaction
         </Button>
       </div>
 
@@ -589,9 +656,9 @@ export function TransactionsPage() {
               .filter(t => {
                 const now = new Date();
                 const txnDate = t.timestamp && !isNaN(t.timestamp.getTime()) ? new Date(t.timestamp) : null;
-                return txnDate && txnDate.getMonth() === now.getMonth() && 
-                       txnDate.getFullYear() === now.getFullYear() && 
-                       (t.status === 'Paid' || t.status === 'completed' || t.status === 'Partial');
+                return txnDate && txnDate.getMonth() === now.getMonth() &&
+                  txnDate.getFullYear() === now.getFullYear() &&
+                  (t.status === 'Paid' || t.status === 'completed' || t.status === 'Partial');
               })
               .reduce((sum, t) => {
                 if (t.status === 'Partial') {
@@ -610,14 +677,14 @@ export function TransactionsPage() {
             <CardTitle className="text-sm text-white">Average Transaction</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold  text-white">₱{transactions.length > 0 
+            <div className="text-2xl font-bold  text-white">₱{transactions.length > 0
               ? (transactions.reduce((sum, t) => {
-                  if (t.status === 'Partial') {
-                    return sum + (t.transactionAmount || 0);
-                  } else {
-                    return sum + (t.totalItemAmount || 0);
-                  }
-                }, 0) / transactions.length).toFixed(2)
+                if (t.status === 'Partial') {
+                  return sum + (t.transactionAmount || 0);
+                } else {
+                  return sum + (t.totalItemAmount || 0);
+                }
+              }, 0) / transactions.length).toFixed(2)
               : '0.00'}</div>
             <p className="text-xs text-muted-foreground  text-white">Average item sales</p>
           </CardContent>
@@ -679,36 +746,54 @@ export function TransactionsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Date Range</Label>
+              <Label>Select Dates</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
-                        <>
-                          {dateRange.from && !isNaN(dateRange.from.getTime()) ? formatDateFns(dateRange.from, "LLL dd, y") : 'Invalid Date'} -{" "}
-                          {dateRange.to && !isNaN(dateRange.to.getTime()) ? formatDateFns(dateRange.to, "LLL dd, y") : 'Invalid Date'}
-                        </>
+                    {selectedDates.length > 0 ? (
+                      selectedDates.length === 1 ? (
+                        formatDateFns(selectedDates[0], "LLL dd, y")
                       ) : (
-                        dateRange.from && !isNaN(dateRange.from.getTime()) ? formatDateFns(dateRange.from, "LLL dd, y") : 'Invalid Date'
+                        `${selectedDates.length} dates selected`
                       )
                     ) : (
-                      <span>Select date range</span>
+                      <span>Select one or more dates</span>
                     )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange.from && !isNaN(dateRange.from.getTime()) ? dateRange.from : undefined}
-                    selected={dateRange}
-                    onSelect={(range) => setDateRange({ from: range?.from,
-                      to: range?.to
-                    })}
-                    numberOfMonths={2}
-                  />
+                  <div className="p-3">
+                    <div className="text-sm font-medium mb-2">Select Dates</div>
+                    <div className="text-xs text-muted-foreground mb-3">
+                      Select one or more dates to filter transactions.
+                    </div>
+                    <Calendar
+                      initialFocus
+                      mode="multiple"
+                      defaultMonth={selectedDates.length > 0 ? selectedDates[0] : undefined}
+                      selected={selectedDates}
+                      onSelect={(dates) => setSelectedDates(dates || [])}
+                      numberOfMonths={2}
+                    />
+                    {selectedDates.length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            {selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''} selected
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedDates([])}
+                            className="h-7 px-2 text-xs"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
@@ -723,7 +808,7 @@ export function TransactionsPage() {
           <CardDescription>
             Showing {startIndex + 1}-{Math.min(endIndex, filteredTransactions.length)} of {filteredTransactions.length} transactions (Page {currentPage} of {totalPages})
           </CardDescription>
-          <DottedSeparator/>
+          <DottedSeparator />
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -748,10 +833,10 @@ export function TransactionsPage() {
                     </TableCell>
                     <TableCell className="text-right px-4">
                       <span className={
-                        transaction.status === 'Credit' 
-                          ? 'text-red-600' 
-                          : transaction.status === 'Partial' 
-                            ? 'text-yellow-600' 
+                        transaction.status === 'Credit'
+                          ? 'text-red-600'
+                          : transaction.status === 'Partial'
+                            ? 'text-yellow-600'
                             : ''
                       }>
                         ₱{transaction.amount.toFixed(2)}
@@ -800,10 +885,10 @@ export function TransactionsPage() {
               </TableBody>
             </Table>
           </div>
-          
+
           {/* Pagination Controls */}
           {totalPages > 1 && (
-             <div className="flex items-center justify-between px-6 py-4 border-t">
+            <div className="flex items-center justify-between px-6 py-4 border-t">
               <div className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </div>
@@ -824,7 +909,7 @@ export function TransactionsPage() {
                 >
                   Previous
                 </Button>
-                
+
                 <div className="flex items-center space-x-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum;
@@ -837,7 +922,7 @@ export function TransactionsPage() {
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <Button
                         key={pageNum}
@@ -851,7 +936,7 @@ export function TransactionsPage() {
                     );
                   })}
                 </div>
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -883,7 +968,7 @@ export function TransactionsPage() {
               Transaction Number: <span className="font-mono font-medium ml-1">{selectedTransaction?.id}</span>
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Transaction Header */}
             <div className="bg-gray-50 rounded-lg p-4">
@@ -896,7 +981,7 @@ export function TransactionsPage() {
                   {selectedTransaction && getStatusBadge(selectedTransaction.status)}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <div>
@@ -909,7 +994,7 @@ export function TransactionsPage() {
                     <p className="text-sm font-medium text-gray-900 mt-1">{selectedTransaction?.course}</p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transaction Amount</Label>
@@ -926,7 +1011,7 @@ export function TransactionsPage() {
                     <p className="text-xs text-gray-500">Total item cost</p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div>
                     <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date & Time</Label>
@@ -960,13 +1045,13 @@ export function TransactionsPage() {
                     })()}
                   </div>
                 </div>
-                
+
                 <div>
                   {(() => {
                     const showThis =
                       selectedTransaction.status === 'Credit' ||
                       (selectedTransaction.status === 'Partial' && selectedTransaction.amount < 0);
-                    
+
                     if (!showThis) {
                       return (
                         <div className="text-center py-3">
@@ -980,7 +1065,7 @@ export function TransactionsPage() {
                         </div>
                       );
                     }
-                    
+
                     const txn = selectedTransaction;
                     return (
                       <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
@@ -997,7 +1082,7 @@ export function TransactionsPage() {
                         </div>
                         <div className="text-right">
                           <p className={`text-sm font-bold ${txn.status === 'Credit' ? 'text-red-600' : 'text-yellow-600'}`}>
-                            ₱{txn.status === 'Credit' 
+                            ₱{txn.status === 'Credit'
                               ? (txn.totalItemAmount || 0).toFixed(2)
                               : Math.abs(txn.amount).toFixed(2)
                             }
@@ -1026,7 +1111,7 @@ export function TransactionsPage() {
               Scan student ID and process payment
             </DialogDescription>
           </DialogHeader>
-          
+
           <BarcodeScanner onAddTransaction={handleNewTransaction} />
         </DialogContent>
       </Dialog>
@@ -1040,7 +1125,7 @@ export function TransactionsPage() {
               Process payment for {editingTransaction?.studentName}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             {/* Transaction Summary - Horizontal Layout */}
             <div className="bg-gray-50 rounded-lg p-4">
@@ -1050,7 +1135,7 @@ export function TransactionsPage() {
                   #{editingTransaction?.id}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-6">
                 <div className="text-center">
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transaction Amount</Label>
@@ -1067,9 +1152,9 @@ export function TransactionsPage() {
                 <div className="text-center">
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Outstanding</Label>
                   <p className="text-xl font-bold text-amber-600 mt-1">
-                    ₱{( 
+                    ₱{(
                       editingTransaction &&
-                      (editingTransaction.status === 'Partial' || editingTransaction.status === 'Credit')
+                        (editingTransaction.status === 'Partial' || editingTransaction.status === 'Credit')
                         ? Math.abs(editingTransaction.amount || 0)
                         : 0
                     ).toFixed(2)}
@@ -1124,14 +1209,14 @@ export function TransactionsPage() {
 
                   {/* Action Buttons */}
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => setEditingTransaction(null)}
                       size="sm"
                     >
                       Cancel
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => handlePayment('partial')}
                       disabled={!paymentAmount || isProcessingPayment || parseFloat(paymentAmount) > Math.abs(editingTransaction?.amount || 0)}
                       size="sm"
@@ -1168,7 +1253,7 @@ export function TransactionsPage() {
               Are you sure you want to delete this transaction? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6">
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-start gap-3">
@@ -1191,15 +1276,15 @@ export function TransactionsPage() {
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setDeletingTransaction(null)}
                 className="px-6"
               >
                 Cancel
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleDeleteTransaction}
                 className="bg-red-600 hover:bg-red-700 px-6"
               >

@@ -13,6 +13,18 @@ A modern React-based management system for university canteens with separate int
 - **Responsive Design**: Mobile-friendly interface
 - **Modern UI**: Built with shadcn/ui components and Tailwind CSS
 
+## Loyalty Feature
+Point Tiers:
+₱25-₱59: 1 point
+₱60-₱99: 2 points
+₱100+: 3 points
+Daily Cap: 3 points maximum
+Your Example is Correct:
+First purchase: ₱60 → 2 points earned (total: 2/3 daily)
+Second purchase: ₱120 → 1 point earned (capped at 3 daily total)
+Would normally give 3 points, but you already have 2
+So you only get 1 more point to reach the 3-point daily limit
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 18 + TypeScript
