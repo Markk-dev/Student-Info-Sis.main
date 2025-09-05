@@ -957,9 +957,15 @@ export function TransactionsPage() {
                   <div className="text-sm text-gray-500">
                     {(() => {
                       const studentTransactions = transactions.filter(t => t.studentId === selectedTransaction.studentId);
-                      const outstandingCount = studentTransactions.filter(t => 
-                        t.status === 'Partial' || t.status === 'Credit'
-                      ).length;
+                      const outstandingCount = studentTransactions.filter(t => {
+                        // Only count transactions with actual outstanding balances
+                        if (t.status === 'Credit') {
+                          return true; // Credit transactions always have outstanding balance
+                        } else if (t.status === 'Partial') {
+                          return t.amount < 0; // Partial transactions with negative amount (remaining balance)
+                        }
+                        return false; // Paid transactions have no outstanding balance
+                      }).length;
                       return `${outstandingCount} ${outstandingCount === 1 ? 'balance' : 'balances'}`;
                     })()}
                   </div>
@@ -968,9 +974,15 @@ export function TransactionsPage() {
                 <div className="space-y-3">
                   {(() => {
                     const studentTransactions = transactions.filter(t => t.studentId === selectedTransaction.studentId);
-                    const outstandingTransactions = studentTransactions.filter(t => 
-                      t.status === 'Partial' || t.status === 'Credit'
-                    );
+                    const outstandingTransactions = studentTransactions.filter(t => {
+                      // Only show transactions with actual outstanding balances
+                      if (t.status === 'Credit') {
+                        return true; // Credit transactions always have outstanding balance
+                      } else if (t.status === 'Partial') {
+                        return t.amount < 0; // Partial transactions with negative amount (remaining balance)
+                      }
+                      return false; // Paid transactions have no outstanding balance
+                    });
                     
                     if (outstandingTransactions.length === 0) {
                       return (
@@ -1061,7 +1073,7 @@ export function TransactionsPage() {
               
               <div className="grid grid-cols-3 gap-6">
                 <div className="text-center">
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Amount Paid</Label>
+                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Transaction Amount</Label>
                   <p className="text-xl font-bold text-blue-600 mt-1">
                     ₱{(editingTransaction?.transactionAmount || 0).toFixed(2)}
                   </p>
@@ -1075,7 +1087,12 @@ export function TransactionsPage() {
                 <div className="text-center">
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Outstanding</Label>
                   <p className="text-xl font-bold text-amber-600 mt-1">
-                    ₱{Math.abs(editingTransaction?.amount || 0).toFixed(2)}
+                    ₱{(
+                      editingTransaction &&
+                      (editingTransaction.status === 'Partial' || editingTransaction.status === 'Credit')
+                        ? Math.abs(editingTransaction.amount || 0)
+                        : 0
+                    ).toFixed(2)}
                   </p>
                 </div>
               </div>
