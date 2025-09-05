@@ -7,9 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Flag, Eye } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { studentService, transactionService } from '@/lib/services';
 import { format } from 'date-fns';
@@ -35,7 +34,7 @@ interface Student {
   registrationDate: Date;
   totalTransactions: number;
   totalSpent: number;
-  status: 'active' | 'flagged' | 'suspended' | 'inactive';
+  status: 'active' | 'suspended' | 'inactive';
   lastTransaction?: Date;
   issues: string[];
   unpaidAmount: number;
@@ -52,9 +51,9 @@ export function StudentsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [actionType, setActionType] = useState<'flag' | 'issue' | 'update' | null>(null);
-  const [actionNote, setActionNote] = useState('');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showSuspensionModal, setShowSuspensionModal] = useState(false);
+  const [showUnsuspendModal, setShowUnsuspendModal] = useState(false);
   const [suspensionPeriod, setSuspensionPeriod] = useState('1day');
   const [customDays, setCustomDays] = useState('');
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
@@ -135,7 +134,7 @@ export function StudentsPage() {
             : undefined;
           
           
-          let status: 'active' | 'flagged' | 'suspended' | 'inactive' = 'active';
+          let status: 'active' | 'suspended' | 'inactive' = 'active';
           
           if (!student.isActive) {
             status = 'suspended';
@@ -246,7 +245,7 @@ export function StudentsPage() {
             : undefined;
           
           
-          let status: 'active' | 'flagged' | 'suspended' | 'inactive' = 'active';
+          let status: 'active' | 'suspended' | 'inactive' = 'active';
           
           if (!student.isActive) {
             status = 'suspended';
@@ -335,7 +334,50 @@ export function StudentsPage() {
     return ['1st Year', '2nd Year', '3rd Year', '4th Year'];
   }, []);
 
-  
+  const handleUnsuspendStudent = async () => {
+    if (!selectedStudent) {
+      toast.error('No student selected');
+      return;
+    }
+
+    try {
+      await studentService.updateStudent(selectedStudent.id, { 
+        isActive: true,
+        suspensionDate: undefined
+      });
+      
+      const studentTransactions = transactions.filter(
+        (txn: any) => txn.studentId === selectedStudent.id
+      );
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      const recentTransactions = studentTransactions.filter((txn: any) => {
+        try {
+          const txnDate = new Date(txn.$createdAt || txn.createdAt);
+          return !isNaN(txnDate.getTime()) && txnDate >= threeDaysAgo;
+        } catch (error) {
+          return false;
+        }
+      });
+      const newStatus = recentTransactions.length >= 3 ? 'active' : 'inactive';
+
+      setStudents(prev => 
+        prev.map(s => 
+          s.id === selectedStudent.id 
+            ? { ...s, status: newStatus, suspensionDate: undefined }
+            : s
+        )
+      );
+
+      setShowUnsuspendModal(false);
+      setSelectedStudent(null);
+      toast.success(`Student ${selectedStudent.name} has been unsuspended.`);
+    } catch (error) {
+      console.error('Error unsuspending student:', error);
+      toast.error('Failed to unsuspend student');
+    }
+  };
+
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
       const matchesSearch = 
@@ -350,50 +392,6 @@ export function StudentsPage() {
       return matchesSearch && matchesCourse && matchesStatus && matchesYear;
     });
   }, [students, searchTerm, courseFilter, statusFilter, yearFilter]);
-
-  const handleStudentAction = async (student: Student, action: 'flag' | 'issue' | 'update' | 'suspend' | 'activate') => {
-    if (action === 'suspend' || action === 'activate') {
-      try {
-        const newStatus = action === 'suspend' ? false : true;
-        await studentService.updateStudent(student.id, { isActive: newStatus });
-        
-        setStudents(prev => 
-          prev.map(s => 
-            s.id === student.id 
-              ? { ...s, status: action === 'suspend' ? 'suspended' : 'active' }
-              : s
-          )
-        );
-        toast.success(`Student ${action}d successfully`);
-      } catch (error) {
-        console.error('Error updating student status:', error);
-        toast.error('Failed to update student status');
-      }
-    } else {
-      
-      setSelectedStudent(student);
-      setActionType(action);
-    }
-  };
-
-  const handleSaveAction = async () => {
-    if (!selectedStudent || !actionType || !actionNote.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    try {
-      
-      
-      toast.success('Action recorded successfully');
-      setSelectedStudent(null);
-      setActionType(null);
-      setActionNote('');
-    } catch (error) {
-      console.error('Error saving action:', error);
-      toast.error('Failed to save action');
-    }
-  };
 
   const handleAddStudent = async () => {
     if (!newStudentData.studentId || !newStudentData.firstName || !newStudentData.lastName || !newStudentData.course || !newStudentData.yearLevel) {
@@ -522,7 +520,6 @@ export function StudentsPage() {
   const getStatusBadge = (status: Student['status']) => {
     const config = {
       active: { variant: 'default' as const, icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', borderColor: 'border-green-200' },
-      flagged: { variant: 'secondary' as const, icon: Flag, color: 'text-yellow-600', bgColor: 'bg-yellow-100', borderColor: 'border-yellow-200' },
       suspended: { variant: 'destructive' as const, icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100', borderColor: 'border-red-200' },
       inactive: { variant: 'outline' as const, icon: Eye, color: 'text-gray-600', bgColor: 'bg-gray-100', borderColor: 'border-gray-200' }
     };
@@ -591,10 +588,10 @@ export function StudentsPage() {
 
         <Card className='bg-primary'>
           <CardHeader className="p-3 pb-2">
-            <CardTitle className="text-xs text-white">Flagged</CardTitle>
+            <CardTitle className="text-xs text-white">Suspended</CardTitle>
           </CardHeader>
           <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-white">{students.filter(s => s.status === 'flagged').length}</div>
+            <div className="text-xl font-bold text-white">{students.filter(s => s.status === 'suspended').length}</div>
           </CardContent>
         </Card>
 
@@ -668,7 +665,6 @@ export function StudentsPage() {
                 <SelectContent>
                   <SelectItem className='text-xs' value="all">All Statuses</SelectItem>
                   <SelectItem className='text-xs' value="active">Active</SelectItem>
-                  <SelectItem className='text-xs' value="flagged">Flagged</SelectItem>
                   <SelectItem className='text-xs' value="suspended">Suspended</SelectItem>
                   <SelectItem className='text-xs' value="inactive">Inactive</SelectItem>
                 </SelectContent>
@@ -727,16 +723,12 @@ export function StudentsPage() {
                       <div className="hidden lg:flex items-center justify-center gap-1 mr-3">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                               setSelectedStudent(student);
-                              setActionType(null); 
+                              setShowDetailsModal(true); 
                           }}>
                               <span className="sr-only">View Details</span>
                               <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStudentAction(student, 'flag')}>
-                              <span className="sr-only">Flag Student</span>
-                              <Flag className="h-4 w-4" />
-                          </Button>
-                          {student.status === 'active' ? (
+                          {student.status !== 'suspended' ? (
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                   setSelectedStudent(student);
                                   setShowSuspensionModal(true);
@@ -744,12 +736,15 @@ export function StudentsPage() {
                                   <span className="sr-only">Suspend Student</span>
                                   <XCircle className="h-4 w-4" />
                               </Button>
-                          ) : student.status === 'inactive' || student.status === 'suspended' ? (
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStudentAction(student, 'activate')}>
-                                  <span className="sr-only">Activate Student</span>
-                                  <CheckCircle className="h-4 w-4" />
-                              </Button>
-                          ) : null}
+                          ) : (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                setSelectedStudent(student);
+                                setShowUnsuspendModal(true);
+                            }}>
+                                <span className="sr-only">Unsuspend Student</span>
+                                <CheckCircle className="h-4 w-4" />
+                            </Button>
+                          )}
                       </div>
 
                       {/* Dropdown for small screens */}
@@ -764,16 +759,12 @@ export function StudentsPage() {
                               <DropdownMenuContent align="center">
                                   <DropdownMenuItem onClick={() => {
                                       setSelectedStudent(student);
-                                      setActionType(null); 
+                                      setShowDetailsModal(true); 
                                   }}>
                                       <Eye className="h-4 w-4 mr-2" />
                                       View Details
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleStudentAction(student, 'flag')}>
-                                      <Flag className="h-4 w-4 mr-2" />
-                                      Flag Student
-                                  </DropdownMenuItem>
-                                  {student.status === 'active' ? (
+                                  {student.status !== 'suspended' ? (
                                       <DropdownMenuItem onClick={() => {
                                           setSelectedStudent(student);
                                           setShowSuspensionModal(true);
@@ -781,12 +772,15 @@ export function StudentsPage() {
                                           <XCircle className="h-4 w-4 mr-2" />
                                           Suspend
                                       </DropdownMenuItem>
-                                  ) : student.status === 'inactive' || student.status === 'suspended' ? (
-                                      <DropdownMenuItem onClick={() => handleStudentAction(student, 'activate')}>
+                                  ) : (
+                                      <DropdownMenuItem onClick={() => {
+                                        setSelectedStudent(student);
+                                        setShowUnsuspendModal(true);
+                                      }}>
                                           <CheckCircle className="h-4 w-4 mr-2" />
-                                          Activate
+                                          Unsuspend
                                       </DropdownMenuItem>
-                                  ) : null}
+                                  )}
                               </DropdownMenuContent>
                           </DropdownMenu>
                       </div>
@@ -800,49 +794,23 @@ export function StudentsPage() {
       </Card>
 
       {/* Student Details/Action Dialog */}
-      <Dialog open={!!selectedStudent} onOpenChange={() => {
-        setSelectedStudent(null);
-        setActionType(null);
-        setActionNote('');
+      <Dialog open={showDetailsModal} onOpenChange={(isOpen) => {
+        setShowDetailsModal(isOpen);
+        if (!isOpen) {
+          setSelectedStudent(null);
+        }
       }}>
         <DialogContent className="max-w-sm md:max-w-2xl">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-lg font-bold">
-              {actionType ? `${actionType === 'flag' ? 'Flag' : 'Report Issue for'} Student` : 'Student Details'}
+              Student Details
             </DialogTitle>
             <DialogDescription className="text-xs">
               {selectedStudent?.name} ({selectedStudent?.id})
             </DialogDescription>
           </DialogHeader>
           
-          {actionType ? (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="action-note" className="text-sm">
-                  {actionType === 'flag' ? 'Reason for flagging' : 'Issue description'}
-                </Label>
-                <Textarea
-                  id="action-note"
-                  placeholder={actionType === 'flag' ? 'Enter reason...' : 'Describe the issue...'}
-                  value={actionNote}
-                  onChange={(e) => setActionNote(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => {
-                  setActionType(null);
-                  setActionNote('');
-                }}>
-                  Cancel
-                </Button>
-                <Button size="sm" onClick={handleSaveAction}>
-                  Save {actionType === 'flag' ? 'Flag' : 'Issue'}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
+          <div className="space-y-3">
               {/* Student Header */}
               <div className="bg-gray-50 rounded-lg p-3">
                 <div className="mb-2">
@@ -965,7 +933,39 @@ export function StudentsPage() {
                 </div>
               )}
             </div>
-          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsuspend Modal */}
+      <Dialog open={showUnsuspendModal} onOpenChange={setShowUnsuspendModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-3 text-lg font-bold">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              </div>
+              Unsuspend Student
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
+              Are you sure you want to unsuspend {selectedStudent?.name} ({selectedStudent?.id})?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex justify-end gap-2 pt-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowUnsuspendModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUnsuspendStudent}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Unsuspend
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
