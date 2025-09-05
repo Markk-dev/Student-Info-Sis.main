@@ -38,10 +38,7 @@ export function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: undefined,
-    to: undefined
-  });
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -142,15 +139,17 @@ export function TransactionsPage() {
       const matchesCourse = courseFilter === 'all' || transaction.course === courseFilter;
       const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
       
-      const matchesDateRange = !dateRange.from || !dateRange.to || 
+      const matchesDateFilter = selectedDates.length === 0 || 
         (transaction.timestamp && !isNaN(transaction.timestamp.getTime()) &&
-         dateRange.from && !isNaN(dateRange.from.getTime()) &&
-         dateRange.to && !isNaN(dateRange.to.getTime()) &&
-         transaction.timestamp >= dateRange.from && transaction.timestamp <= dateRange.to);
+         selectedDates.some(selectedDate => {
+           const txnDate = new Date(transaction.timestamp);
+           const selectedDateOnly = new Date(selectedDate);
+           return txnDate.toDateString() === selectedDateOnly.toDateString();
+         }));
 
-      return matchesSearch && matchesCourse && matchesStatus && matchesDateRange;
+      return matchesSearch && matchesCourse && matchesStatus && matchesDateFilter;
     });
-  }, [transactions, searchTerm, courseFilter, statusFilter, dateRange]);
+  }, [transactions, searchTerm, courseFilter, statusFilter, selectedDates]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
@@ -161,7 +160,7 @@ export function TransactionsPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, courseFilter, statusFilter, dateRange]);
+  }, [searchTerm, courseFilter, statusFilter, selectedDates]);
 
   const getStatusBadge = (status: Transaction['status']) => {
     const config = {
@@ -679,36 +678,54 @@ export function TransactionsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Date Range</Label>
+              <Label>Select Dates</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
-                        <>
-                          {dateRange.from && !isNaN(dateRange.from.getTime()) ? formatDateFns(dateRange.from, "LLL dd, y") : 'Invalid Date'} -{" "}
-                          {dateRange.to && !isNaN(dateRange.to.getTime()) ? formatDateFns(dateRange.to, "LLL dd, y") : 'Invalid Date'}
-                        </>
+                    {selectedDates.length > 0 ? (
+                      selectedDates.length === 1 ? (
+                        formatDateFns(selectedDates[0], "LLL dd, y")
                       ) : (
-                        dateRange.from && !isNaN(dateRange.from.getTime()) ? formatDateFns(dateRange.from, "LLL dd, y") : 'Invalid Date'
+                        `${selectedDates.length} dates selected`
                       )
                     ) : (
-                      <span>Select date range</span>
+                      <span>Select one or more dates</span>
                     )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange.from && !isNaN(dateRange.from.getTime()) ? dateRange.from : undefined}
-                    selected={dateRange}
-                    onSelect={(range) => setDateRange({ from: range?.from,
-                      to: range?.to
-                    })}
-                    numberOfMonths={2}
-                  />
+                  <div className="p-3">
+                    <div className="text-sm font-medium mb-2">Select Dates</div>
+                    <div className="text-xs text-muted-foreground mb-3">
+                      Select one or more dates to filter transactions.
+                    </div>
+                    <Calendar
+                      initialFocus
+                      mode="multiple"
+                      defaultMonth={selectedDates.length > 0 ? selectedDates[0] : undefined}
+                      selected={selectedDates}
+                      onSelect={(dates) => setSelectedDates(dates || [])}
+                      numberOfMonths={2}
+                    />
+                    {selectedDates.length > 0 && (
+                      <div className="mt-3 pt-3 border-t">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">
+                            {selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''} selected
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedDates([])}
+                            className="h-7 px-2 text-xs"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
