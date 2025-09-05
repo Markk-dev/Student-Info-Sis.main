@@ -13,7 +13,19 @@ import { Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Flag, Eye } fro
 import { toast } from 'sonner';
 import { studentService, transactionService } from '@/lib/services';
 import { format } from 'date-fns';
-import { DottedSeparator } from '../ui/dotted-line';
+
+// Predefined arrays for courses and year levels - easily modifiable
+const COURSES = [
+  'BSIT', 'BSCS', 'BSIS', 'BSEMC', 'BSCE', 'BSEE', 'BSME', 'BSIE', 'BSA', 'BSBA',
+  'BSHM', 'BSTM', 'BSN', 'BSMT', 'BSRT', 'BSPHARMA', 'BSPHARM',
+  'AB', 'AB PSYCH', 'AB POLSCI', 'AB ENG', 'AB HIST', 'AB COMM',
+  'BEED', 'BSED', 'BSE', 'BSED MATH', 'BSED SCI', 'BSED ENG',
+  'BS CRIM', 'BS CIVIL ENG', 'BS IND ENG', 'EDUC', 'BSPT'
+];
+
+const YEAR_LEVELS = [
+  '1st Year', '2nd Year', '3rd Year', '4th Year'
+];
 
 interface Student {
   id: string;
@@ -45,6 +57,40 @@ export function StudentsPage() {
   const [showSuspensionModal, setShowSuspensionModal] = useState(false);
   const [suspensionPeriod, setSuspensionPeriod] = useState('1day');
   const [customDays, setCustomDays] = useState('');
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [newStudentData, setNewStudentData] = useState({
+    studentId: '',
+    firstName: '',
+    lastName: '',
+    course: '',
+    yearLevel: '',
+    email: ''
+  });
+  const [courseSearch, setCourseSearch] = useState('');
+  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
+
+  // Filtered courses based on search
+  const filteredCourses = COURSES.filter(course =>
+    course.toLowerCase().includes(courseSearch.toLowerCase())
+  );
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (isCourseDropdownOpen && !target.closest('.course-dropdown-container')) {
+        setIsCourseDropdownOpen(false);
+      }
+    };
+
+    if (isCourseDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCourseDropdownOpen]);
 
   
   useEffect(() => {
@@ -349,6 +395,130 @@ export function StudentsPage() {
     }
   };
 
+  const handleAddStudent = async () => {
+    if (!newStudentData.studentId || !newStudentData.firstName || !newStudentData.lastName || !newStudentData.course || !newStudentData.yearLevel) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      await studentService.createStudent({
+        id: newStudentData.studentId,
+        name: `${newStudentData.firstName} ${newStudentData.lastName}`,
+        course: newStudentData.course,
+        yearLevel: newStudentData.yearLevel,
+        isRegistered: true
+      });
+
+      // Refresh the students list
+      const studentsResponse = await studentService.getStudents();
+      const transactionsResponse = await transactionService.getTransactions();
+      
+      const transformedStudents: Student[] = studentsResponse.documents.map((student: any) => {
+        const studentTransactions = transactionsResponse.documents.filter(
+          (txn: any) => txn.studentId === student.studentId
+        );
+        
+        const totalSpent = studentTransactions.reduce((sum: number, txn: any) => {
+          return sum + (txn.status === 'Paid' ? txn.amount : 0);
+        }, 0);
+        
+        const unpaidAmount = studentTransactions.reduce((sum: number, txn: any) => {
+          return sum + (txn.status === 'Credit' ? Math.abs(txn.amount) : 0);
+        }, 0);
+        
+        const lastTransaction = studentTransactions.length > 0 
+          ? (() => {
+              const dates = studentTransactions.map((txn: any) => {
+                try {
+                  const date = new Date(txn.$createdAt || txn.createdAt);
+                  return isNaN(date.getTime()) ? null : date;
+                } catch (error) {
+                  return null;
+                }
+              }).filter(date => date !== null);
+              
+              return dates.length > 0 ? new Date(Math.max(...dates.map(d => d!.getTime()))) : undefined;
+            })()
+          : undefined;
+        
+        let status: 'active' | 'flagged' | 'suspended' | 'inactive' = 'active';
+        
+        if (!student.isActive) {
+          status = 'suspended';
+        } else {
+          const threeDaysAgo = new Date();
+          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+          
+          const recentTransactions = studentTransactions.filter((txn: any) => {
+            try {
+              const txnDate = new Date(txn.$createdAt || txn.createdAt);
+              return !isNaN(txnDate.getTime()) && txnDate >= threeDaysAgo;
+            } catch (error) {
+              return false;
+            }
+          });
+          
+          if (recentTransactions.length >= 3) {
+            status = 'active';
+          } else {
+            status = 'inactive';
+          }
+        }
+        
+        return {
+          id: student.studentId,
+          name: `${student.firstName} ${student.lastName}`,
+          course: student.course,
+          yearLevel: student.yearLevel,
+          registrationDate: (() => {
+            try {
+              const date = new Date(student.createdAt);
+              return isNaN(date.getTime()) ? new Date() : date;
+            } catch (error) {
+              return new Date();
+            }
+          })(),
+          totalTransactions: studentTransactions.length,
+          totalSpent,
+          status,
+          lastTransaction,
+          issues: [], 
+          unpaidAmount,
+          email: student.email,
+          suspensionDate: student.suspensionDate ? (() => {
+            try {
+              const date = new Date(student.suspensionDate);
+              return isNaN(date.getTime()) ? undefined : date;
+            } catch (error) {
+              return undefined;
+            }
+          })() : undefined
+        };
+      });
+      
+      setStudents(transformedStudents);
+      setShowAddStudentModal(false);
+      setNewStudentData({
+        studentId: '',
+        firstName: '',
+        lastName: '',
+        course: '',
+        yearLevel: '',
+        email: ''
+      });
+      setCourseSearch('');
+      toast.success('Student added successfully!');
+    } catch (error: any) {
+      console.error('Error adding student:', error);
+      if (error.message) {
+        toast.error(`Error adding student: ${error.message}`);
+      } else {
+        toast.error('Failed to add student');
+      }
+    }
+  };
+
   const getStatusBadge = (status: Student['status']) => {
     const config = {
       active: { variant: 'default' as const, icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100', borderColor: 'border-green-200' },
@@ -393,7 +563,7 @@ export function StudentsPage() {
     <div className="space-y-4">
       {/* Action Button */}
       <div className="flex justify-end">
-        <Button size="sm">
+        <Button size="sm" onClick={() => setShowAddStudentModal(true)}>
           <UserPlus className="h-4 w-4 mr-2" />
           Add Student
         </Button>
@@ -526,9 +696,9 @@ export function StudentsPage() {
                   <TableHead className="hidden md:table-cell px-4">Course & Year</TableHead>
                   <TableHead className="hidden sm:table-cell px-4">Transactions</TableHead>
                   <TableHead className="hidden md:table-cell px-4">Total Spent</TableHead>
-                  <TableHead className="px-4">Status</TableHead>
+                  <TableHead className="px-5">Status</TableHead>
                   <TableHead className="hidden lg:table-cell px-4">Last Transaction</TableHead>
-                  <TableHead className="px-4">Actions</TableHead>
+                  <TableHead className="px-5 ml-5">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -552,41 +722,74 @@ export function StudentsPage() {
                     <TableCell className="hidden lg:table-cell px-4 py-2 text-sm">
                       {student.lastTransaction ? formatDate(student.lastTransaction) : 'Never'}
                     </TableCell>
-                    <TableCell className="px-4 py-2">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-7 w-7">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedStudent(student);
-                            setActionType(null); 
-                          }}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStudentAction(student, 'flag')}>
-                            <Flag className="h-4 w-4 mr-2" />
-                            Flag Student
-                          </DropdownMenuItem>
-                          {student.status === 'active' ? (
-                            <DropdownMenuItem onClick={() => {
+                    <TableCell className="px-4 py-2 text-center">
+                      {/* Icons for large screens */}
+                      <div className="hidden lg:flex items-center justify-center gap-1 mr-3">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                               setSelectedStudent(student);
-                              setShowSuspensionModal(true);
-                            }}>
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Suspend
-                            </DropdownMenuItem>
+                              setActionType(null); 
+                          }}>
+                              <span className="sr-only">View Details</span>
+                              <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStudentAction(student, 'flag')}>
+                              <span className="sr-only">Flag Student</span>
+                              <Flag className="h-4 w-4" />
+                          </Button>
+                          {student.status === 'active' ? (
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                  setSelectedStudent(student);
+                                  setShowSuspensionModal(true);
+                              }}>
+                                  <span className="sr-only">Suspend Student</span>
+                                  <XCircle className="h-4 w-4" />
+                              </Button>
                           ) : student.status === 'inactive' || student.status === 'suspended' ? (
-                            <DropdownMenuItem onClick={() => handleStudentAction(student, 'activate')}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Activate
-                            </DropdownMenuItem>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStudentAction(student, 'activate')}>
+                                  <span className="sr-only">Activate Student</span>
+                                  <CheckCircle className="h-4 w-4" />
+                              </Button>
                           ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      </div>
+
+                      {/* Dropdown for small screens */}
+                      <div className="lg:hidden inline-block">
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <span className="sr-only">More Actions</span>
+                                      <MoreHorizontal className="h-5 w-5" />
+                                  </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="center">
+                                  <DropdownMenuItem onClick={() => {
+                                      setSelectedStudent(student);
+                                      setActionType(null); 
+                                  }}>
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleStudentAction(student, 'flag')}>
+                                      <Flag className="h-4 w-4 mr-2" />
+                                      Flag Student
+                                  </DropdownMenuItem>
+                                  {student.status === 'active' ? (
+                                      <DropdownMenuItem onClick={() => {
+                                          setSelectedStudent(student);
+                                          setShowSuspensionModal(true);
+                                      }}>
+                                          <XCircle className="h-4 w-4 mr-2" />
+                                          Suspend
+                                      </DropdownMenuItem>
+                                  ) : student.status === 'inactive' || student.status === 'suspended' ? (
+                                      <DropdownMenuItem onClick={() => handleStudentAction(student, 'activate')}>
+                                          <CheckCircle className="h-4 w-4 mr-2" />
+                                          Activate
+                                      </DropdownMenuItem>
+                                  ) : null}
+                              </DropdownMenuContent>
+                          </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -875,6 +1078,162 @@ export function StudentsPage() {
               >
                 <XCircle className="h-4 w-4 mr-2" />
                 Suspend
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Student Modal */}
+      <Dialog open={showAddStudentModal} onOpenChange={setShowAddStudentModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-3 text-lg font-bold">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <UserPlus className="h-5 w-5 text-blue-600" />
+              </div>
+              Add New Student
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
+              Enter student information to register them in the system
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="new-student-id" className="text-sm font-medium">Student ID *</Label>
+                <Input
+                  id="new-student-id"
+                  placeholder="Enter student ID"
+                  value={newStudentData.studentId}
+                  onChange={(e) => setNewStudentData(prev => ({ ...prev, studentId: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="new-student-firstName" className="text-sm font-medium">First Name *</Label>
+                  <Input
+                    id="new-student-firstName"
+                    placeholder="First name"
+                    value={newStudentData.firstName}
+                    onChange={(e) => setNewStudentData(prev => ({ ...prev, firstName: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-student-lastName" className="text-sm font-medium">Last Name *</Label>
+                  <Input
+                    id="new-student-lastName"
+                    placeholder="Last name"
+                    value={newStudentData.lastName}
+                    onChange={(e) => setNewStudentData(prev => ({ ...prev, lastName: e.target.value }))}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="new-student-email" className="text-sm font-medium">Email (Optional)</Label>
+                <Input
+                  id="new-student-email"
+                  type="email"
+                  placeholder="student@email.com"
+                  value={newStudentData.email}
+                  onChange={(e) => setNewStudentData(prev => ({ ...prev, email: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="new-student-course" className="text-sm font-medium">Course *</Label>
+                <div className="relative course-dropdown-container mt-1">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                    <Input
+                      placeholder="Search course..."
+                      value={newStudentData.course || courseSearch}
+                      onChange={(e) => {
+                        setCourseSearch(e.target.value);
+                        if (e.target.value !== newStudentData.course) {
+                          setNewStudentData(prev => ({ ...prev, course: '' }));
+                        }
+                      }}
+                      onFocus={() => setIsCourseDropdownOpen(true)}
+                      className={`pl-7 ${newStudentData.course ? 'bg-green-50 border-green-300' : ''}`}
+                    />
+                  </div>
+                  {isCourseDropdownOpen && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      {filteredCourses.length > 0 ? (
+                        filteredCourses.slice(0, 10).map((course) => (
+                          <button
+                            key={course}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setNewStudentData(prev => ({ ...prev, course: course }));
+                              setCourseSearch('');
+                              setIsCourseDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                          >
+                            {course}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-1.5 text-sm text-gray-500">No courses found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="new-student-year" className="text-sm font-medium">Year Level *</Label>
+                <Select
+                  value={newStudentData.yearLevel}
+                  onValueChange={(value) => setNewStudentData(prev => ({ ...prev, yearLevel: value }))}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select year level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEAR_LEVELS.map((year) => (
+                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAddStudentModal(false);
+                  setNewStudentData({
+                    studentId: '',
+                    firstName: '',
+                    lastName: '',
+                    course: '',
+                    yearLevel: '',
+                    email: ''
+                  });
+                  setCourseSearch('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddStudent}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Student
               </Button>
             </div>
           </div>

@@ -730,23 +730,23 @@ export function TransactionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-bold">Student</TableHead>
-                  <TableHead className="font-bold text-right">Amount</TableHead>
-                  <TableHead className="font-bold">Status</TableHead>
-                  <TableHead className="font-bold hidden sm:table-cell">Date</TableHead>
-                  <TableHead className="font-bold text-right">Actions</TableHead>
+                  <TableHead className="font-bold px-4">Student</TableHead>
+                  <TableHead className="font-bold text-right px-4">Amount</TableHead>
+                  <TableHead className="font-bold px-4">Status</TableHead>
+                  <TableHead className="font-bold hidden sm:table-cell px-4">Date</TableHead>
+                  <TableHead className="font-bold text-center px-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
-                    <TableCell>
+                    <TableCell className="px-4">
                       <div>
                         <p className="text-sm">{transaction.studentName}</p>
                         <p className="text-xs text-muted-foreground font-mono">{transaction.studentId}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right px-4">
                       <span className={
                         transaction.status === 'Credit' 
                           ? 'text-red-600' 
@@ -757,15 +757,15 @@ export function TransactionsPage() {
                         ₱{transaction.amount.toFixed(2)}
                       </span>
                     </TableCell>
-                    <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                    <TableCell className="hidden sm:table-cell">
+                    <TableCell className="px-4">{getStatusBadge(transaction.status)}</TableCell>
+                    <TableCell className="hidden sm:table-cell px-4">
                       <div>
                         <p className="text-xs">{formatDate(transaction.timestamp)}</p>
                         <p className="text-xs text-muted-foreground">{formatTime(transaction.timestamp)}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
+                    <TableCell className="text-center px-4">
+                      <div className="flex gap-1 justify-center items-center">
                         <Button
                           variant="ghost"
                           size="icon"
