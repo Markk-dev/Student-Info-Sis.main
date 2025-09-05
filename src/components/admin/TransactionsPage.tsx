@@ -212,7 +212,7 @@ export function TransactionsPage() {
 
   const exportCSV = () => {
     
-    const headers = ['Transaction Number', 'Student ID', 'Student Name', 'Course', 'Amount', 'Date', 'Time', 'Cashier', 'Status'];
+    const headers = ['Transaction Number', 'Student ID', 'Student Name', 'Course', 'Amount', 'Date & Time', 'Cashier', 'Status'];
     const csvContent = [
       headers.join(','),
       ...filteredTransactions.map(t => [
@@ -221,8 +221,8 @@ export function TransactionsPage() {
         `"${t.studentName}"`,
         `"${t.course}"`,
         t.amount.toFixed(2),
-        formatDate(t.timestamp),
-        formatTime(t.timestamp),
+        // Combine date and time without year and quote to avoid comma issues
+        `"${formatDateFns(t.timestamp, 'MMM d')}_${formatDateFns(t.timestamp, 'HH:mm')}"`,
         `"${t.cashier}"`,
         t.status
       ].join(','))
