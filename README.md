@@ -25,6 +25,35 @@ Second purchase: ₱120 → 1 point earned (capped at 3 daily total)
 Would normally give 3 points, but you already have 2
 So you only get 1 more point to reach the 3-point daily limit
 
+## Payment Tracking & Credit System
+### Payment Terms
+- **₱50 and below**: 3 days to pay
+- **₱51-₱99**: 4 days to pay  
+- **₱100 and above**: 5 days to pay
+
+### Weekend & Holiday Protection
+- Due dates automatically adjust to avoid weekends and holidays
+- If due date falls on Saturday/Sunday, payment is due the next business day
+- Philippine holidays are automatically detected and excluded
+
+### Loyalty Point Deductions
+- **Grace Period**: 12 hours after due date
+- **Initial Deduction**: 1-2 points for first late payment
+- **Daily Deduction**: 4 points maximum per day for continued non-payment
+- **No Recovery**: Deducted points are not restored (punishment system)
+
+### Account Status Management
+- **20+ Points**: Full access to all transaction types
+- **90+ Points**: Can make partial payments
+- **100+ Points**: Can make credit transactions
+- **Below 20 Points**: Account suspended (cannot login)
+- **0 Points**: Account banned (5-7 days depending on amount)
+
+### Daily Processing
+- **Automatic**: Runs daily at 6:00 AM
+- **Manual**: Admins can trigger processing manually
+- **Real-time**: Overdue status updates in real-time
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: React 18 + TypeScript

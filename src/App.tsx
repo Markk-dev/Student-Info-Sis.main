@@ -46,7 +46,8 @@ function AppContent() {
     const studentData = user.data as Student;
     // Convert Appwrite Student to StudentDashboard expected format
     const dashboardStudentData = {
-      id: studentData.studentId,
+      id: studentData.$id || '', // Document ID for fetching student data
+      studentId: studentData.studentId, // Student ID for fetching transactions
       name: `${studentData.firstName} ${studentData.lastName}`,
       course: studentData.course,
       yearLevel: studentData.yearLevel

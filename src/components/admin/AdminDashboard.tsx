@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Users, TrendingUp, TrendingDown, PhilippinePeso, ShoppingCart, Settings, Target, RefreshCw  } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, PhilippinePeso, ShoppingCart, Settings, Target, RefreshCw, Clock  } from 'lucide-react';
 import { studentService, transactionService } from '@/lib/services';
 import { format, subDays, startOfDay, endOfDay, getHours } from 'date-fns';
 import { toast } from 'sonner';
 import { DottedSeparator } from '../ui/dotted-line';
+import { DailyJobProcessor } from './DailyJobProcessor';
 
 const COLORS = ['#14a800', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -802,6 +803,15 @@ export function AdminDashboard() {
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Daily Job Processor Section */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="h-5 w-5 text-blue-500" />
+          <h2 className="text-xl font-semibold">Payment Processing</h2>
+        </div>
+        <DailyJobProcessor />
       </div>
     </div>
   );

@@ -303,8 +303,8 @@ export function TransactionsPage() {
         actualLoyaltyPointsEarned = Math.min(loyaltyPointsEarned, remainingDailyPoints);
       }
 
-      // Create the transaction
-      await transactionService.createTransaction({
+      // Create the transaction with due date calculation
+      await transactionService.createTransactionWithDueDate({
         studentId: transactionData.studentId,
         amount: amount, // Calculated based on status
         transactionAmount: transactionData.transactionAmount, // Amount customer handed over

@@ -1,6 +1,7 @@
 import { account, databases, DATABASE_ID, COLLECTIONS } from './appwrite';
 import { ID, Query } from 'appwrite';
 import type { Student, Admin, Transaction, Product, Order, Settings } from './appwrite';
+import { calculateDueDate, updateTransactionDueDate, isTransactionOverdue } from './paymentTracking';
 
 // Authentication Services
 export const authService = {
@@ -406,6 +407,58 @@ export const transactionService = {
       return await databases.deleteDocument(DATABASE_ID, COLLECTIONS.TRANSACTIONS, transactionId);
     } catch (error) {
       console.error('Delete transaction error:', error);
+      throw error;
+    }
+  },
+
+  // Payment tracking functions
+  async createTransactionWithDueDate(data: any) {
+    try {
+      const transaction = await this.createTransaction(data);
+      
+      // Calculate and set due date for partial and credit transactions
+      if (data.status === 'Partial' || data.status === 'Credit') {
+        const dueDate = calculateDueDate(new Date(), data.totalItemAmount);
+        const isOverdue = isTransactionOverdue({
+          dueDate: dueDate.toISOString(),
+          status: data.status
+        });
+        
+        await updateTransactionDueDate(transaction.$id, dueDate, isOverdue);
+      }
+      
+      return transaction;
+    } catch (error) {
+      console.error('Create transaction with due date error:', error);
+      throw error;
+    }
+  },
+
+  async getOverdueTransactions() {
+    try {
+      return await databases.listDocuments(
+        DATABASE_ID,
+        COLLECTIONS.TRANSACTIONS,
+        [Query.equal('isOverdue', true)]
+      );
+    } catch (error) {
+      console.error('Get overdue transactions error:', error);
+      throw error;
+    }
+  },
+
+  async getStudentOverdueTransactions(studentId: string) {
+    try {
+      return await databases.listDocuments(
+        DATABASE_ID,
+        COLLECTIONS.TRANSACTIONS,
+        [
+          Query.equal('studentId', studentId),
+          Query.equal('isOverdue', true)
+        ]
+      );
+    } catch (error) {
+      console.error('Get student overdue transactions error:', error);
       throw error;
     }
   }
