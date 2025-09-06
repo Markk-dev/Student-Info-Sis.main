@@ -140,7 +140,7 @@ export function PaymentStatus({ studentId }: PaymentStatusProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {overdueTransactions.map((transaction) => (
+              {overdueTransactions.map((transaction: any) => (
                 <div key={transaction.$id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div>

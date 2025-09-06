@@ -118,31 +118,56 @@ export function isTransactionOverdue(transaction: any): boolean {
   const dueDate = new Date(transaction.dueDate);
   const now = new Date();
   
-  // Add 12-hour grace period
-  const gracePeriod = new Date(dueDate.getTime() + 12 * 60 * 60 * 1000);
+  // Add 24-hour grace period (1 day)
+  const gracePeriod = new Date(dueDate.getTime() + 24 * 60 * 60 * 1000);
   
   return now > gracePeriod;
 }
 
 /**
  * Calculate loyalty points to deduct for overdue transaction
+ * Only deducts if no deduction has been made today
  */
 export function calculateLoyaltyDeduction(transaction: any): number {
   if (!isTransactionOverdue(transaction)) return 0;
   
   const dueDate = new Date(transaction.dueDate);
   const now = new Date();
-  const gracePeriod = new Date(dueDate.getTime() + 12 * 60 * 60 * 1000);
+  
+  // Grace period: 24 hours (1 day) after due date
+  const gracePeriod = new Date(dueDate.getTime() + 24 * 60 * 60 * 1000);
   
   // If still in grace period, no deduction
   if (now <= gracePeriod) return 0;
   
+  // Check if we already deducted today
+  const lastDeductionDate = transaction.lastDeductionDate ? new Date(transaction.lastDeductionDate) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  if (lastDeductionDate) {
+    const lastDeductionDay = new Date(lastDeductionDate);
+    lastDeductionDay.setHours(0, 0, 0, 0);
+    
+    // If we already deducted today, don't deduct again
+    if (lastDeductionDay.getTime() === today.getTime()) {
+      return 0;
+    }
+  }
+  
+  // Calculate days overdue (after grace period)
   const daysOverdue = Math.floor((now.getTime() - gracePeriod.getTime()) / (1000 * 60 * 60 * 24));
   
-  if (daysOverdue === 0) {
-    return LOYALTY_DEDUCTIONS.INITIAL;
+  // Deduction phases based on days overdue:
+  if (daysOverdue >= 5) {
+    // Phase 3: 5+ days overdue → 4 points deduction (highest)
+    return 4;
+  } else if (daysOverdue >= 2) {
+    // Phase 2: 2-4 days overdue → 2 points deduction
+    return 2;
   } else {
-    return LOYALTY_DEDUCTIONS.ESCALATED;
+    // Phase 1: 1 day overdue (after grace period) → 1 point deduction
+    return 1;
   }
 }
 
@@ -166,11 +191,229 @@ export function shouldBanAccount(loyaltyPoints: number, amount: number): { shoul
 }
 
 /**
+ * Check if a transaction has been processed for deduction today
+ */
+export function hasBeenProcessedToday(transaction: any): boolean {
+  if (!transaction.lastDeductionDate) return false;
+  
+  const lastDeductionDate = new Date(transaction.lastDeductionDate);
+  const today = new Date();
+  
+  // Compare dates (ignore time)
+  return lastDeductionDate.toDateString() === today.toDateString();
+}
+
+/**
+ * Calculate countdown to due date
+ */
+export function getDueDateCountdown(dueDate: string): {
+  daysRemaining: number;
+  hoursRemaining: number;
+  isOverdue: boolean;
+  isDueToday: boolean;
+  isDueSoon: boolean; // Within 2 days
+} {
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffMs = due.getTime() - now.getTime();
+  
+  const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const hoursRemaining = Math.ceil(diffMs / (1000 * 60 * 60));
+  
+  const isOverdue = diffMs < 0;
+  const isDueToday = daysRemaining === 0 && !isOverdue;
+  const isDueSoon = daysRemaining <= 2 && daysRemaining > 0;
+  
+  return {
+    daysRemaining: Math.max(0, daysRemaining),
+    hoursRemaining: Math.max(0, hoursRemaining),
+    isOverdue,
+    isDueToday,
+    isDueSoon
+  };
+}
+
+/**
+ * Get alarm level and message for payment due
+ */
+export function getPaymentAlarmLevel(transaction: any): {
+  level: 'info' | 'warning' | 'danger' | 'critical';
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  textColor: string;
+  message: string;
+  deductionWarning: string;
+} {
+  const due = new Date(transaction.dueDate);
+  const now = new Date();
+  const diffMs = due.getTime() - now.getTime();
+  const hoursOverdue = Math.abs(diffMs) / (1000 * 60 * 60);
+  
+  // Grace period: 24 hours (1 day) after due date
+  const gracePeriodHours = 24;
+  
+  if (diffMs > 0) {
+    // Not yet due
+    const daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (daysRemaining <= 1) {
+      return {
+        level: 'warning',
+        color: 'orange',
+        bgColor: 'bg-orange-50',
+        borderColor: 'border-orange-300',
+        textColor: 'text-orange-800',
+        message: 'PAYMENT DUE SOON!',
+        deductionWarning: 'Pay now to avoid loyalty point deductions!'
+      };
+    } else if (daysRemaining <= 2) {
+      return {
+        level: 'info',
+        color: 'blue',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-300',
+        textColor: 'text-blue-800',
+        message: 'Payment Due',
+        deductionWarning: 'Make payment to avoid deductions'
+      };
+    } else {
+      return {
+        level: 'info',
+        color: 'blue',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-300',
+        textColor: 'text-blue-800',
+        message: 'Payment Due',
+        deductionWarning: 'Make payment to avoid deductions'
+      };
+    }
+  } else if (hoursOverdue <= gracePeriodHours) {
+    // Within grace period (24 hours)
+    return {
+      level: 'danger',
+      color: 'red',
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-300',
+      textColor: 'text-red-800',
+      message: 'PAYMENT OVERDUE - GRACE PERIOD!',
+      deductionWarning: `Grace period ends in ${Math.ceil(gracePeriodHours - hoursOverdue)} hours! After that, 1 point will be deducted!`
+    };
+  } else {
+    // After grace period - calculate actual days overdue
+    const gracePeriodEnd = new Date(due.getTime() + gracePeriodHours * 60 * 60 * 1000);
+    const actualDaysOverdue = Math.floor((now.getTime() - gracePeriodEnd.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (actualDaysOverdue >= 5) {
+      // Phase 3: 5+ days overdue → 4 points deduction
+      return {
+        level: 'critical',
+        color: 'red',
+        bgColor: 'bg-red-100',
+        borderColor: 'border-red-500',
+        textColor: 'text-red-900',
+        message: 'PAYMENT SEVERELY OVERDUE!',
+        deductionWarning: `${actualDaysOverdue} days overdue! 4 loyalty points deducted daily! Account suspension risk!`
+      };
+    } else if (actualDaysOverdue >= 2) {
+      // Phase 2: 2-4 days overdue → 2 points deduction
+      return {
+        level: 'critical',
+        color: 'red',
+        bgColor: 'bg-red-100',
+        borderColor: 'border-red-500',
+        textColor: 'text-red-900',
+        message: 'PAYMENT OVERDUE - DEDUCTIONS ESCALATED!',
+        deductionWarning: `${actualDaysOverdue} days overdue! 2 loyalty points deducted daily!`
+      };
+    } else {
+      // Phase 1: 1 day overdue (after grace period) → 1 point deduction
+      return {
+        level: 'critical',
+        color: 'red',
+        bgColor: 'bg-red-100',
+        borderColor: 'border-red-500',
+        textColor: 'text-red-900',
+        message: 'PAYMENT OVERDUE - DEDUCTIONS STARTED!',
+        deductionWarning: `${actualDaysOverdue + 1} days overdue! 1 loyalty point deducted daily!`
+      };
+    }
+  }
+}
+
+/**
+ * Get deduction summary for a transaction
+ */
+export function getDeductionSummary(transaction: any): {
+  totalDeductions: number;
+  daysOverdue: number;
+  canDeductToday: boolean;
+  nextDeductionAmount: number;
+} {
+  const totalDeductions = transaction.loyaltyDeductions || 0;
+  const canDeductToday = !hasBeenProcessedToday(transaction);
+  const nextDeductionAmount = canDeductToday ? calculateLoyaltyDeduction(transaction) : 0;
+  
+  let daysOverdue = 0;
+  if (transaction.dueDate) {
+    const dueDate = new Date(transaction.dueDate);
+    const gracePeriod = new Date(dueDate.getTime() + 24 * 60 * 60 * 1000); // 24 hours grace period
+    const now = new Date();
+    
+    if (now > gracePeriod) {
+      daysOverdue = Math.floor((now.getTime() - gracePeriod.getTime()) / (1000 * 60 * 60 * 24));
+    }
+  }
+  
+  return {
+    totalDeductions,
+    daysOverdue,
+    canDeductToday,
+    nextDeductionAmount
+  };
+}
+
+/**
+ * Get all due payments for a student (both upcoming and overdue, but not paid)
+ */
+export async function getUpcomingDuePayments(studentId: string): Promise<any[]> {
+  try {
+    // Get both Partial and Credit transactions that have due dates and are not paid
+    const partialResponse = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.TRANSACTIONS,
+      [
+        Query.equal('studentId', studentId),
+        Query.equal('status', 'Partial')
+      ]
+    );
+    
+    const creditResponse = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.TRANSACTIONS,
+      [
+        Query.equal('studentId', studentId),
+        Query.equal('status', 'Credit')
+      ]
+    );
+    
+    const allTransactions = [...partialResponse.documents, ...creditResponse.documents];
+    
+    // Filter to only include transactions with due dates (both upcoming and overdue)
+    return allTransactions.filter(transaction => transaction.dueDate);
+  } catch (error) {
+    console.error('Error fetching upcoming due payments:', error);
+    return [];
+  }
+}
+
+/**
  * Get all overdue transactions for a student
  */
 export async function getOverdueTransactions(studentId: string): Promise<any[]> {
   try {
-    const response = await databases.listDocuments(
+    // Get both Partial and Credit transactions that are overdue for this student
+    const partialResponse = await databases.listDocuments(
       DATABASE_ID,
       COLLECTIONS.TRANSACTIONS,
       [
@@ -180,7 +423,17 @@ export async function getOverdueTransactions(studentId: string): Promise<any[]> 
       ]
     );
     
-    return response.documents;
+    const creditResponse = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.TRANSACTIONS,
+      [
+        Query.equal('studentId', studentId),
+        Query.equal('status', 'Credit'),
+        Query.equal('isOverdue', true)
+      ]
+    );
+    
+    return [...partialResponse.documents, ...creditResponse.documents];
   } catch (error) {
     console.error('Error fetching overdue transactions:', error);
     return [];
@@ -192,7 +445,8 @@ export async function getOverdueTransactions(studentId: string): Promise<any[]> 
  */
 export async function getAllOverdueTransactions(): Promise<any[]> {
   try {
-    const response = await databases.listDocuments(
+    // Get both Partial and Credit transactions that are overdue
+    const partialResponse = await databases.listDocuments(
       DATABASE_ID,
       COLLECTIONS.TRANSACTIONS,
       [
@@ -201,7 +455,16 @@ export async function getAllOverdueTransactions(): Promise<any[]> {
       ]
     );
     
-    return response.documents;
+    const creditResponse = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.TRANSACTIONS,
+      [
+        Query.equal('status', 'Credit'),
+        Query.equal('isOverdue', true)
+      ]
+    );
+    
+    return [...partialResponse.documents, ...creditResponse.documents];
   } catch (error) {
     console.error('Error fetching all overdue transactions:', error);
     return [];
@@ -302,7 +565,11 @@ export async function suspendStudentAccount(studentId: string, reason: string = 
 /**
  * Process daily loyalty deductions for overdue transactions
  */
-export async function processDailyLoyaltyDeductions(): Promise<void> {
+export async function processDailyLoyaltyDeductions(): Promise<{ processedCount: number; deductedCount: number; errors: string[] }> {
+  const errors: string[] = [];
+  let processedCount = 0;
+  let deductedCount = 0;
+  
   try {
     console.log('Starting daily loyalty deduction process...');
     
@@ -312,8 +579,11 @@ export async function processDailyLoyaltyDeductions(): Promise<void> {
     for (const transaction of overdueTransactions) {
       try {
         const deductionAmount = calculateLoyaltyDeduction(transaction);
+        processedCount++;
         
         if (deductionAmount > 0) {
+          console.log(`Deducting ${deductionAmount} points from student ${transaction.studentId} for transaction ${transaction.$id}`);
+          
           // Deduct loyalty points
           await deductLoyaltyPoints(transaction.studentId, deductionAmount);
           
@@ -329,6 +599,8 @@ export async function processDailyLoyaltyDeductions(): Promise<void> {
             }
           );
           
+          deductedCount++;
+          
           // Check if account should be suspended or banned
           const studentsResponse = await databases.listDocuments(
             DATABASE_ID,
@@ -341,19 +613,28 @@ export async function processDailyLoyaltyDeductions(): Promise<void> {
             const newLoyalty = student.loyalty || 0;
             
             if (shouldSuspendAccount(newLoyalty)) {
+              console.log(`Suspending account for student ${transaction.studentId} due to low loyalty points: ${newLoyalty}`);
               await suspendStudentAccount(transaction.studentId, 'Loyalty points below threshold');
             }
           }
+        } else {
+          console.log(`No deduction needed for transaction ${transaction.$id} (already processed today or not eligible)`);
         }
       } catch (error) {
-        console.error(`Error processing transaction ${transaction.$id}:`, error);
+        const errorMsg = `Error processing transaction ${transaction.$id}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        console.error(errorMsg);
+        errors.push(errorMsg);
         // Continue with other transactions
       }
     }
     
-    console.log(`Processed ${overdueTransactions.length} overdue transactions`);
+    console.log(`Processed ${processedCount} overdue transactions, applied deductions to ${deductedCount} transactions`);
+    return { processedCount, deductedCount, errors };
   } catch (error) {
-    console.error('Error in daily loyalty deduction process:', error);
+    const errorMsg = `Error in daily loyalty deduction process: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    console.error(errorMsg);
+    errors.push(errorMsg);
+    return { processedCount, deductedCount, errors };
   }
 }
 
@@ -365,7 +646,7 @@ export async function updateOverdueStatus(): Promise<void> {
     console.log('Updating overdue status for all transactions...');
     
     // Get all partial and credit transactions
-    const response = await databases.listDocuments(
+    const partialResponse = await databases.listDocuments(
       DATABASE_ID,
       COLLECTIONS.TRANSACTIONS,
       [
@@ -373,7 +654,17 @@ export async function updateOverdueStatus(): Promise<void> {
       ]
     );
     
-    for (const transaction of response.documents) {
+    const creditResponse = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.TRANSACTIONS,
+      [
+        Query.equal('status', 'Credit')
+      ]
+    );
+    
+    const allTransactions = [...partialResponse.documents, ...creditResponse.documents];
+    
+    for (const transaction of allTransactions) {
       const isOverdue = isTransactionOverdue(transaction);
       
       if (transaction.isOverdue !== isOverdue) {
@@ -388,7 +679,7 @@ export async function updateOverdueStatus(): Promise<void> {
       }
     }
     
-    console.log(`Updated overdue status for ${response.documents.length} transactions`);
+    console.log(`Updated overdue status for ${allTransactions.length} transactions`);
   } catch (error) {
     console.error('Error updating overdue status:', error);
   }

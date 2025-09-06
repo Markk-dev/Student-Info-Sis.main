@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
-import { processDailyLoyaltyDeductions, updateOverdueStatus, getAllOverdueTransactions } from '@/lib/paymentTracking';
+import { processDailyLoyaltyDeductions, updateOverdueStatus, getAllOverdueTransactions, getDeductionSummary } from '@/lib/paymentTracking';
+import { hasJobRunToday, getLastJobExecution, logJobStart, logJobCompletion } from '@/lib/jobExecutionLog';
 import { toast } from 'sonner';
 
 interface JobStatus {
@@ -12,6 +13,7 @@ interface JobStatus {
   nextRun: Date | null;
   overdueCount: number;
   error: string | null;
+  hasRunToday: boolean;
 }
 
 export function DailyJobProcessor() {
@@ -20,7 +22,8 @@ export function DailyJobProcessor() {
     lastRun: null,
     nextRun: null,
     overdueCount: 0,
-    error: null
+    error: null,
+    hasRunToday: false
   });
 
   const [overdueTransactions, setOverdueTransactions] = useState<any[]>([]);
@@ -30,13 +33,21 @@ export function DailyJobProcessor() {
     const now = new Date();
     const nextRun = new Date(now);
     nextRun.setHours(6, 0, 0, 0);
-    
-    // If it's already past 6 AM today, set for tomorrow
-    if (now.getHours() >= 6) {
+
+    // If it's already past 6 AM today or job has run today, set for tomorrow
+    if (now.getHours() >= 6 || jobStatus.hasRunToday) {
       nextRun.setDate(nextRun.getDate() + 1);
     }
-    
+
     return nextRun;
+  };
+
+  // Check if job has run today
+  const hasRunToday = () => {
+    if (!jobStatus.lastRun) return false;
+    const today = new Date();
+    const lastRun = new Date(jobStatus.lastRun);
+    return today.toDateString() === lastRun.toDateString();
   };
 
   // Load overdue transactions
@@ -52,58 +63,160 @@ export function DailyJobProcessor() {
 
   // Run the daily job
   const runDailyJob = async () => {
+    if (jobStatus.isRunning || jobStatus.hasRunToday) return;
+
     setJobStatus(prev => ({ ...prev, isRunning: true, error: null }));
-    
+
+    let executionId: string | null = null;
+
     try {
       console.log('Starting daily job...');
-      
+
+      // Log job start
+      executionId = await logJobStart('daily_payment_processing', 'manual');
+
       // Update overdue status first
       await updateOverdueStatus();
-      
+
       // Process loyalty deductions
-      await processDailyLoyaltyDeductions();
-      
+      const result = await processDailyLoyaltyDeductions();
+
       // Reload overdue transactions
       await loadOverdueTransactions();
-      
-      setJobStatus(prev => ({
-        ...prev,
+
+      const now = new Date();
+      const newStatus = {
         isRunning: false,
-        lastRun: new Date(),
+        lastRun: now,
         nextRun: calculateNextRun(),
+        hasRunToday: true,
         error: null
-      }));
-      
-      toast.success('Daily job completed successfully');
+      };
+
+      setJobStatus(prev => ({ ...prev, ...newStatus }));
+
+      // Persist to localStorage
+      saveJobStatus({
+        lastRun: now,
+        hasRunToday: true
+      });
+
+      // Log job completion
+      if (executionId) {
+        await logJobCompletion(
+          executionId,
+          'completed',
+          result.processedCount,
+          result.deductedCount,
+          result.errors
+        );
+      }
+
+      toast.success(`Daily job completed successfully! Processed ${result.processedCount} transactions, applied ${result.deductedCount} deductions.`);
     } catch (error) {
       console.error('Error running daily job:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
       setJobStatus(prev => ({
         ...prev,
         isRunning: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage
       }));
-      toast.error('Daily job failed');
+
+      // Log job failure
+      if (executionId) {
+        await logJobCompletion(executionId, 'failed', 0, 0, [errorMessage]);
+      }
+
+      toast.error('Daily job failed: ' + errorMessage);
+    }
+  };
+
+  // Load job status from database and localStorage
+  const loadJobStatus = async () => {
+    try {
+      // Check database first for authoritative status
+      const hasRunTodayDB = await hasJobRunToday('daily_payment_processing');
+      const lastExecution = await getLastJobExecution('daily_payment_processing');
+
+      setJobStatus(prev => ({
+        ...prev,
+        lastRun: lastExecution ? new Date(lastExecution.endTime || lastExecution.startTime) : null,
+        hasRunToday: hasRunTodayDB,
+        nextRun: calculateNextRun()
+      }));
+
+      // Also save to localStorage for faster loading next time
+      saveJobStatus({
+        lastRun: lastExecution ? new Date(lastExecution.endTime || lastExecution.startTime) : null,
+        hasRunToday: hasRunTodayDB
+      });
+    } catch (error) {
+      console.error('Error loading job status from database:', error);
+      // Fallback to localStorage
+      loadPersistedJobStatus();
+    }
+  };
+
+  // Load persisted job status from localStorage (fallback)
+  const loadPersistedJobStatus = () => {
+    try {
+      const saved = localStorage.getItem('dailyJobStatus');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const lastRun = parsed.lastRun ? new Date(parsed.lastRun) : null;
+        const hasRun = lastRun ? lastRun.toDateString() === new Date().toDateString() : false;
+
+        setJobStatus(prev => ({
+          ...prev,
+          lastRun,
+          hasRunToday: hasRun,
+          nextRun: calculateNextRun()
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading persisted job status:', error);
+    }
+  };
+
+  // Save job status to localStorage
+  const saveJobStatus = (status: Partial<JobStatus>) => {
+    try {
+      const currentSaved = localStorage.getItem('dailyJobStatus');
+      const current = currentSaved ? JSON.parse(currentSaved) : {};
+      const updated = { ...current, ...status };
+      localStorage.setItem('dailyJobStatus', JSON.stringify(updated));
+    } catch (error) {
+      console.error('Error saving job status:', error);
     }
   };
 
   // Load data on component mount
   useEffect(() => {
     loadOverdueTransactions();
-    setJobStatus(prev => ({ ...prev, nextRun: calculateNextRun() }));
+    loadJobStatus();
   }, []);
 
-  // Auto-run job at 6 AM (simplified - in production you'd use a proper cron job)
+  // Auto-run job at 6 AM and reset hasRunToday at midnight
   useEffect(() => {
     const checkTime = () => {
       const now = new Date();
-      if (now.getHours() === 6 && now.getMinutes() === 0) {
+
+      // Reset hasRunToday at midnight
+      if (now.getHours() === 0 && now.getMinutes() === 0) {
+        setJobStatus(prev => ({ ...prev, hasRunToday: false }));
+        saveJobStatus({ hasRunToday: false });
+      }
+
+      // Auto-run at 6 AM if not already run today
+      if (now.getHours() === 6 && now.getMinutes() === 0 && !jobStatus.hasRunToday) {
         runDailyJob();
       }
     };
 
     const interval = setInterval(checkTime, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, []);
+  }, [jobStatus.hasRunToday]);
 
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
@@ -136,58 +249,61 @@ export function DailyJobProcessor() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Job Status Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="compact">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
             {getStatusIcon()}
             Daily Payment Processing Job
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Automatically processes overdue payments and loyalty point deductions
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Status</p>
-              <p className="text-lg font-semibold">{getStatusText()}</p>
+              <p className="text-xs font-medium text-muted-foreground">Status</p>
+              <p className="text-sm font-semibold">{getStatusText()}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Last Run</p>
-              <p className="text-lg font-semibold">
+              <p className="text-xs font-medium text-muted-foreground">Last Run</p>
+              <p className="text-sm font-semibold">
                 {jobStatus.lastRun ? formatDate(jobStatus.lastRun) : 'Never'}
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Next Run</p>
-              <p className="text-lg font-semibold">
+              <p className="text-xs font-medium text-muted-foreground">Next Run</p>
+              <p className="text-sm font-semibold">
                 {jobStatus.nextRun ? formatDate(jobStatus.nextRun) : 'Not scheduled'}
               </p>
             </div>
           </div>
 
           {jobStatus.error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-800">
+            <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-xs text-red-800">
                 <strong>Error:</strong> {jobStatus.error}
               </p>
             </div>
           )}
 
           <div className="flex gap-2">
-            <Button 
-              onClick={runDailyJob} 
-              disabled={jobStatus.isRunning}
+            <Button
+              onClick={runDailyJob}
+              disabled={jobStatus.isRunning || jobStatus.hasRunToday}
               className="flex-1"
+              size="sm"
             >
-              {jobStatus.isRunning ? 'Processing...' : 'Run Now'}
+              {jobStatus.isRunning ? 'Processing...' :
+                jobStatus.hasRunToday ? 'Already Run Today' : 'Run Now'}
             </Button>
-            <Button 
-              onClick={loadOverdueTransactions} 
+            <Button
+              onClick={loadOverdueTransactions}
               variant="outline"
               disabled={jobStatus.isRunning}
+              size="sm"
             >
               Refresh
             </Button>
@@ -196,58 +312,55 @@ export function DailyJobProcessor() {
       </Card>
 
       {/* Overdue Transactions Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-orange-500" />
+      <Card className="compact">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
             Overdue Transactions
-            <Badge variant="secondary" className="ml-2">
+            <Badge variant="secondary" className="ml-2 text-xs">
               {overdueTransactions.length}
             </Badge>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Transactions that are past their due date and may have loyalty deductions
           </CardDescription>
         </CardHeader>
         <CardContent>
           {overdueTransactions.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <p className="text-muted-foreground">No overdue transactions</p>
-              <p className="text-sm text-muted-foreground">
+            <div className="text-center py-4">
+              <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No overdue transactions</p>
+              <p className="text-xs text-muted-foreground">
                 All payments are up to date
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {overdueTransactions.slice(0, 10).map((transaction) => (
-                <div key={transaction.$id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+            <div className="space-y-2">
+              {overdueTransactions.slice(0, 5).map((transaction) => (
+                <div key={transaction.$id} className="flex items-center justify-between p-2 border rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
                     <div>
-                      <p className="font-medium">Student: {transaction.studentId}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Amount: ₱{Math.abs(transaction.amount).toFixed(2)}
-                      </p>
+                      <p className="text-sm font-medium">Student: {transaction.studentId}</p>
                       <p className="text-xs text-muted-foreground">
-                        Due: {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString() : 'Unknown'}
+                        ₱{Math.abs(transaction.amount).toFixed(2)} • Due: {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString() : 'Unknown'}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <Badge variant="destructive" className="mb-1">
+                    <Badge variant="destructive" className="text-xs mb-1">
                       {transaction.status}
                     </Badge>
                     <p className="text-xs text-muted-foreground">
-                      Deductions: {transaction.loyaltyDeductions || 0}
+                      Deductions: {transaction.loyaltyDeductions || 0} | Days overdue: {getDeductionSummary(transaction).daysOverdue}
                     </p>
                   </div>
                 </div>
               ))}
-              
-              {overdueTransactions.length > 10 && (
-                <p className="text-sm text-muted-foreground text-center">
-                  And {overdueTransactions.length - 10} more...
+
+              {overdueTransactions.length > 5 && (
+                <p className="text-xs text-muted-foreground text-center pt-2">
+                  And {overdueTransactions.length - 5} more...
                 </p>
               )}
             </div>

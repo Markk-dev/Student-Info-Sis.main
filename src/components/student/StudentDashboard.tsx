@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, PhilippinePeso, ShoppingCart, Clock, CreditCard, CheckCircle, LogOut, Key, ChevronDown } from 'lucide-react';
 import { transactionService, studentService } from '@/lib/services';
+import { getUpcomingDuePayments, getDueDateCountdown, getPaymentAlarmLevel } from '@/lib/paymentTracking';
 import { format } from 'date-fns';
 import { DottedSeparator } from '../ui/dotted-line';
 import { toast } from 'sonner';
@@ -52,6 +53,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [upcomingDuePayments, setUpcomingDuePayments] = useState<any[]>([]);
   const itemsPerPage = 5;
 
   
@@ -138,6 +140,15 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           });
         }
         
+        // Load upcoming due payments
+        try {
+          const duePayments = await getUpcomingDuePayments(studentData.studentId);
+          setUpcomingDuePayments(duePayments);
+        } catch (error) {
+          console.error('Error loading upcoming due payments:', error);
+          setUpcomingDuePayments([]);
+        }
+        
       } catch (error) {
         console.error('Error loading student data:', error);
       } finally {
@@ -147,6 +158,26 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
 
     loadStudentData();
   }, [studentData.id]);
+
+  // Refresh upcoming due payments frequently to update countdown and alarm levels
+  useEffect(() => {
+    const refreshDuePayments = async () => {
+      try {
+        const duePayments = await getUpcomingDuePayments(studentData.studentId);
+        setUpcomingDuePayments(duePayments);
+      } catch (error) {
+        console.error('Error refreshing upcoming due payments:', error);
+      }
+    };
+
+    // Refresh immediately
+    refreshDuePayments();
+
+    // Set up interval to refresh every 30 seconds for more responsive updates
+    const interval = setInterval(refreshDuePayments, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [studentData.studentId]);
 
   const handleChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
@@ -282,7 +313,9 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
     
     transactions.forEach(t => {
       const category = t.status || 'Other';
-      categories.set(category, (categories.get(category) || 0) + t.amount);
+      // Use absolute value for display purposes to ensure positive values in the chart
+      const amount = Math.abs(t.amount);
+      categories.set(category, (categories.get(category) || 0) + amount);
     });
 
     return Array.from(categories.entries()).map(([category, amount]) => ({
@@ -321,12 +354,57 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         </div>
       )}
 
+      {/* Payment Due Warning */}
+      {upcomingDuePayments.length > 0 && (
+        <div className="space-y-1">
+          {upcomingDuePayments.map((payment, index) => {
+            const alarm = getPaymentAlarmLevel(payment);
+            const countdown = getDueDateCountdown(payment.dueDate);
+            const dueDate = new Date(payment.dueDate);
+            const totalAmount = Math.abs(payment.totalItemAmount || payment.amount);
+            
+            return (
+              <div key={payment.$id || index} className={`p-1.5 sm:p-2 ${alarm.bgColor} border ${alarm.borderColor} rounded shadow-sm`}>
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 ${alarm.color === 'red' ? 'bg-red-500' : alarm.color === 'orange' ? 'bg-orange-500' : 'bg-blue-500'} rounded-full animate-pulse flex-shrink-0`}></div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs sm:text-sm ${alarm.textColor} font-semibold leading-tight`}>
+                      <span className="font-bold">₱{totalAmount.toFixed(2)}</span> due{' '}
+                      {countdown.isOverdue ? (
+                        <span className="font-bold text-red-600">
+                          {countdown.daysRemaining === 0 ? 'TODAY' : `${Math.abs(countdown.daysRemaining)}d ago`}
+                        </span>
+                      ) : countdown.isDueToday ? (
+                        <span className="font-bold text-red-600">TODAY</span>
+                      ) : countdown.isDueSoon ? (
+                        <span className="font-bold text-orange-600">
+                          in {countdown.daysRemaining}d
+                        </span>
+                      ) : (
+                        <span className="font-semibold">
+                          {dueDate.toLocaleDateString()}
+                        </span>
+                      )}
+                    </p>
+                    {alarm.level === 'critical' && (
+                      <p className={`text-xs ${alarm.textColor} font-medium leading-tight`}>
+                        {alarm.deductionWarning.replace(/[🔥🚨⚠️]/g, '').trim()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div className='flex flex-col gap-1 sm:gap-2'>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-500">Welcome back, {studentData.name}!</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-           <span>Student ID:</span> {studentData.id}
+           <span>Student ID:</span> {studentData.studentId}
           </p>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">

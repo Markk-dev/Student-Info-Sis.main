@@ -18,7 +18,8 @@ export const COLLECTIONS = {
   TRANSACTIONS: 'transactions',
   PRODUCTS: 'products',
   ORDERS: 'orders',
-  SETTINGS: 'settings'
+  SETTINGS: 'settings',
+  JOB_EXECUTIONS: 'job_executions'
 } as const;
 
 // Database schema types
