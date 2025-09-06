@@ -534,7 +534,7 @@ export const settingsService = {
       }
       // Return default settings if none exist
       return {
-        canteenName: 'University Canteen',
+        canteenName: 'Canteen Management',
         operatingHours: { open: '7:00 AM', close: '8:00 PM' },
         maxDailySpend: 1000,
         currency: 'PHP',
@@ -544,7 +544,7 @@ export const settingsService = {
       console.error('Get settings error:', error);
       // Return default settings on error
       return {
-        canteenName: 'University Canteen',
+        canteenName: 'Canteen Management',
         operatingHours: { open: '7:00 AM', close: '8:00 PM' },
         maxDailySpend: 1000,
         currency: 'PHP',
@@ -563,7 +563,7 @@ export const settingsService = {
       } else {
         // Create new settings document
         return await databases.createDocument(DATABASE_ID, COLLECTIONS.SETTINGS, ID.unique(), {
-          canteenName: 'University Canteen',
+          canteenName: 'Canteen Management',
           operatingHours: { open: '7:00 AM', close: '8:00 PM' },
           maxDailySpend: 1000,
           currency: 'PHP',

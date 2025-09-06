@@ -18,7 +18,7 @@ export function AuthLayout({ children, activeTab, onTabChange, title, subtitle }
           <div className="bg-green-500 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
             <User className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">University Canteen</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-1">Canteen Management</h1>
           <p className="text-gray-600">Management System</p>
         </div>
 

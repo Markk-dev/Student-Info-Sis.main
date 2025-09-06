@@ -2,17 +2,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, PhilippinePeso, ShoppingCart, Clock, CreditCard, CheckCircle, LogOut, Key, ChevronDown } from 'lucide-react';
+import { TrendingUp, PhilippinePeso, ShoppingCart, Clock, CreditCard, CheckCircle } from 'lucide-react';
 import { transactionService, studentService } from '@/lib/services';
 import { getUpcomingDuePayments, getDueDateCountdown, getPaymentAlarmLevel } from '@/lib/paymentTracking';
 import { format } from 'date-fns';
 import { DottedSeparator } from '../ui/dotted-line';
-import { toast } from 'sonner';
 
 interface Transaction {
   id: string;
@@ -49,10 +44,6 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
     canMakeTransactions: true
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [upcomingDuePayments, setUpcomingDuePayments] = useState<any[]>([]);
   const itemsPerPage = 5;
 
@@ -179,51 +170,6 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
     return () => clearInterval(interval);
   }, [studentData.studentId]);
 
-  const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error('New passwords do not match');
-      return;
-    }
-    
-    if (newPassword.length < 6) {
-      toast.error('New password must be at least 6 characters');
-      return;
-    }
-    
-    try {
-      // Here you would implement the actual password change logic
-      // For now, just show success message
-      toast.success('Password changed successfully');
-      setShowChangePassword(false);
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (error) {
-      toast.error('Failed to change password');
-    }
-  };
-
-  const handleLogout = () => {
-    try {
-      // Clear any stored authentication data
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('userData');
-      
-      // Show logout message
-      toast.success('Logged out successfully');
-      
-      // Redirect to login page or reload
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Error during logout');
-    }
-  };
 
   
   const formatDate = (date: Date) => {
@@ -406,28 +352,6 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           <p className="text-xs sm:text-sm text-muted-foreground">
            <span>Student ID:</span> {studentData.studentId}
           </p>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* User Dropdown - Replaces Logout text */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
-                <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Logout</span>
-                <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => setShowChangePassword(true)} className="flex items-center gap-2 text-xs sm:text-sm">
-                <Key className="h-4 w-4" />
-                Change Password
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 text-red-600 text-xs sm:text-sm">
-                <LogOut className="h-4 w-4" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 
@@ -722,72 +646,6 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         </CardContent>
       </Card>
 
-      {/* Change Password Modal */}
-      <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              Change Password
-            </DialogTitle>
-            <DialogDescription>
-              Enter your current password and choose a new password
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="oldPassword">Current Password</Label>
-              <Input
-                id="oldPassword"
-                type="password"
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="Enter current password"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="newPassword">New Password</Label>
-              <Input
-                id="newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-              />
-            </div>
-            
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowChangePassword(false);
-                  setOldPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleChangePassword}>
-                Change Password
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

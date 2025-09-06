@@ -1,6 +1,6 @@
-# University Canteen Management System
+# Canteen Management System
 
-A modern React-based management system for university canteens with separate interfaces for administrators and students.
+A modern React-based management system for Canteen Management with separate interfaces for administrators and students.
 
 ## 🚀 Features
 

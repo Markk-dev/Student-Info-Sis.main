@@ -680,46 +680,9 @@ export function SettingsPage() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">System Version</Label>
-              <span className="text-sm">v1.1.0</span>
+              <span className="text-sm">v1.2.0</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Data Management */}
-      <Card>
-        <CardHeader className="p-4">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Database className="h-5 w-5" />
-            Data Management
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Export or import system data
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div className="space-y-0.5">
-                  <Label>Export Data</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Export student or transaction data in CSV format.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => exportData('Students')}>Export Students</Button>
-                    <Button variant="outline" size="sm" onClick={() => exportData('Transactions')}>Export Transactions</Button>
-                </div>
-            </div>
-            <Separator />
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div className="space-y-0.5">
-                  <Label>Import Data</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Import data from a CSV file.
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => importData()}>Import Data</Button>
-            </div>
         </CardContent>
       </Card>
     </div>
