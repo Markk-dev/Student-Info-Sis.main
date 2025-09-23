@@ -678,9 +678,9 @@ export function SettingsPage() {
                 <span className="text-sm">{dbStatus === 'connected' ? 'Connected' : 'Error'}</span>
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 flex flex-col">
               <Label className="text-xs">System Version</Label>
-              <span className="text-sm">v1.2.0</span>
+              <span className="text-sm">v1.2.2</span>
             </div>
           </div>
         </CardContent>

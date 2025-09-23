@@ -9,7 +9,6 @@ import {
   Users, 
   Settings, 
   LogOut, 
-  QrCode, 
   Bell,
   Search,
   HelpCircle,
@@ -61,16 +60,19 @@ function AdminSidebar({ currentPage, setCurrentPage, adminData }: { currentPage:
   const { isOpen } = useSidebar();
 
   return (
-    <Sidebar className={`w-60 md:w-64 border-r bg-card transition-all duration-300 fixed lg:relative z-50 h-full ${!isOpen ? 'hidden lg:flex' : 'flex'}`}>
-      <SidebarHeader className="flex-col px-2 py-2 -mt-2.5 bg-background">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="flex flex-col">
-            <span className="font-semibold text-sm md:text-sm">Canteen Management</span>
-            <span className="text-sm text-muted-foreground">Admin Panel</span>
+      <Sidebar className={`w-60 md:w-64 border-r bg-card transition-all duration-300 fixed lg:relative z-50 h-full ${!isOpen ? 'hidden lg:flex' : 'flex'}`}>
+        <SidebarHeader className="flex-col -mt-1 !px-2">
+          <div className="flex items-center gap-3 mb-4 justify-start w-full">
+            <img src="/logo/CanSys.svg" alt="CanSys" className="h-7 w-7" />
+            <div className="flex flex-col leading-tight">
+              <span className="font-semibold text-base">CanSys</span>
+              <span className="text-xs text-muted-foreground">Admin Panel</span>
+            </div>
           </div>
-        </div>
-        <LineSeparator />
-      </SidebarHeader>
+          <LineSeparator />
+        </SidebarHeader>
+
+
 
       <SidebarContent className="px-3 py-4">
         <SidebarMenu>

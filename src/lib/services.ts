@@ -52,7 +52,7 @@ export const authService = {
           course: studentData.course,
           yearLevel: studentData.yearLevel,
           balance: 0,
-          loyalty: 50, // Automatic 50 loyalty points for new students
+          loyalty: 25, // Automatic 25 loyalty points for new students
           isActive: true
         }
       );
@@ -237,7 +237,7 @@ export const studentService = {
         course: data.course,
         yearLevel: data.yearLevel,
         balance: 0,
-        loyalty: 50, // Automatic 50 loyalty points for new students
+        loyalty: 25, // Automatic 25 loyalty points for new students
         isActive: true
       };
 

@@ -132,15 +132,13 @@ function AppContent() {
         <header className="border-b bg-card">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary rounded-lg w-10 h-10 flex items-center justify-center">
-                  <span className="text-primary-foreground font-semibold">UC</span>
-                </div>
-                <div>
-                  <h1 className="font-semibold">University Canteen</h1>
-                  <p className="text-sm text-muted-foreground">Student Portal</p>
-                </div>
+            <div className="flex items-center gap-2.5">
+              <img src="/logo/CanSys.svg" alt="CanSys" className="h-7 w-7" />
+              <div className="leading-tight">
+                <h1 className="font-semibold text-base">CanSys</h1>
+                <p className="text-xs text-muted-foreground">Student Portal</p>
               </div>
+            </div>
               {/* User Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

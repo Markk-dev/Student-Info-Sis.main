@@ -7,9 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Download, Plus, Search, Filter, Eye, Edit, Trash2, CalendarIcon } from 'lucide-react';
+import { Download, Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { transactionService, studentService } from '@/lib/services';
 import { format as formatDateFns } from 'date-fns';
@@ -38,7 +36,7 @@ export function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  // Removed date filter per request
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -139,17 +137,9 @@ export function TransactionsPage() {
       const matchesCourse = courseFilter === 'all' || transaction.course === courseFilter;
       const matchesStatus = statusFilter === 'all' || transaction.status === statusFilter;
 
-      const matchesDateFilter = selectedDates.length === 0 ||
-        (transaction.timestamp && !isNaN(transaction.timestamp.getTime()) &&
-          selectedDates.some(selectedDate => {
-            const txnDate = new Date(transaction.timestamp);
-            const selectedDateOnly = new Date(selectedDate);
-            return txnDate.toDateString() === selectedDateOnly.toDateString();
-          }));
-
-      return matchesSearch && matchesCourse && matchesStatus && matchesDateFilter;
+      return matchesSearch && matchesCourse && matchesStatus;
     });
-  }, [transactions, searchTerm, courseFilter, statusFilter, selectedDates]);
+  }, [transactions, searchTerm, courseFilter, statusFilter]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
@@ -160,7 +150,7 @@ export function TransactionsPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, courseFilter, statusFilter, selectedDates]);
+  }, [searchTerm, courseFilter, statusFilter]);
 
   const getStatusBadge = (status: Transaction['status']) => {
     const config = {
@@ -745,58 +735,7 @@ export function TransactionsPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Select Dates</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {selectedDates.length > 0 ? (
-                      selectedDates.length === 1 ? (
-                        formatDateFns(selectedDates[0], "LLL dd, y")
-                      ) : (
-                        `${selectedDates.length} dates selected`
-                      )
-                    ) : (
-                      <span>Select one or more dates</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <div className="p-3">
-                    <div className="text-sm font-medium mb-2">Select Dates</div>
-                    <div className="text-xs text-muted-foreground mb-3">
-                      Select one or more dates to filter transactions.
-                    </div>
-                    <Calendar
-                      initialFocus
-                      mode="multiple"
-                      defaultMonth={selectedDates.length > 0 ? selectedDates[0] : undefined}
-                      selected={selectedDates}
-                      onSelect={(dates) => setSelectedDates(dates || [])}
-                      numberOfMonths={2}
-                    />
-                    {selectedDates.length > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            {selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''} selected
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedDates([])}
-                            className="h-7 px-2 text-xs"
-                          >
-                            Clear
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+            {/* Date filter removed */}
           </div>
         </CardContent>
       </Card>
