@@ -63,9 +63,9 @@ function AdminSidebar({ currentPage, setCurrentPage, adminData }: { currentPage:
       <Sidebar className={`w-60 md:w-64 border-r bg-card transition-all duration-300 fixed lg:relative z-50 h-full ${!isOpen ? 'hidden lg:flex' : 'flex'}`}>
         <SidebarHeader className="flex-col -mt-1 !px-2">
           <div className="flex items-center gap-3 mb-4 justify-start w-full">
-            <img src="/logo/CanSys.svg" alt="CanSys" className="h-7 w-7" />
+            <img src="/logo/Logo.svg" alt="CanSys" className="h-8 w-8"/>
             <div className="flex flex-col leading-tight">
-              <span className="font-semibold text-base">CanSys</span>
+              <span className="font-bold text-base">CanSys</span>
               <span className="text-xs text-muted-foreground">Admin Panel</span>
             </div>
           </div>

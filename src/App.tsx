@@ -133,9 +133,9 @@ function AppContent() {
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <img src="/logo/CanSys.svg" alt="CanSys" className="h-7 w-7" />
+              <img src="/logo/Logo.svg" alt="CanSys" className="h-8 w-8" />
               <div className="leading-tight">
-                <h1 className="font-semibold text-base">CanSys</h1>
+                <h1 className="font-bold text-base">CanSys</h1>
                 <p className="text-xs text-muted-foreground">Student Portal</p>
               </div>
             </div>
