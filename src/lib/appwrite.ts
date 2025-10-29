@@ -1,9 +1,17 @@
 import { Client, Account, Databases, Storage } from 'appwrite';
 
 // Appwrite configuration
+// Use a relative endpoint during development so the dev server (or dev-tunnel) can proxy requests
+// to the real Appwrite server and avoid CORS/third-party cookie issues. In production use the
+// real Appwrite endpoint.
+const devEndpoint = typeof window !== 'undefined' ? `${window.location.origin}/v1` : '/v1';
+const prodEndpoint = 'https://syd.cloud.appwrite.io/v1';
+// `import.meta.env` typing can cause TS errors in some configs; cast to any for simplicity here.
+const endpoint = (import.meta as any).env.DEV ? devEndpoint : prodEndpoint;
+
 const client = new Client()
-    .setEndpoint('https://syd.cloud.appwrite.io/v1')
-    .setProject('68a4b08c0015c7abf0ee');
+  .setEndpoint(endpoint)
+  .setProject('68a4b08c0015c7abf0ee');
 
 // Initialize Appwrite services
 export const account = new Account(client);
