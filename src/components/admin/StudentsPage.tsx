@@ -12,6 +12,7 @@ import { Search, MoreHorizontal, UserPlus, CheckCircle, XCircle, Eye } from 'luc
 import { toast } from 'sonner';
 import { studentService, transactionService } from '@/lib/services';
 import { format } from 'date-fns';
+import { Barcode } from '@/components/ui/barcode';
 
 // Predefined arrays for courses and year levels - easily modifiable
 const COURSES = [
@@ -396,15 +397,23 @@ export function StudentsPage() {
   const handleAddStudent = async () => {
     console.log('Form data:', newStudentData); // Debug log
     
-    if (!newStudentData.studentId || !newStudentData.firstName || !newStudentData.lastName || !newStudentData.course || !newStudentData.yearLevel) {
+    if (!newStudentData.studentId || !newStudentData.firstName || !newStudentData.lastName || !newStudentData.course || !newStudentData.yearLevel || !newStudentData.email) {
       console.log('Missing fields:', {
         studentId: !newStudentData.studentId,
         firstName: !newStudentData.firstName,
         lastName: !newStudentData.lastName,
         course: !newStudentData.course,
-        yearLevel: !newStudentData.yearLevel
+        yearLevel: !newStudentData.yearLevel,
+        email: !newStudentData.email
       }); // Debug log
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    const trimmedEmail = newStudentData.email.trim();
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(trimmedEmail)) {
+      toast.error('Please enter a valid email address');
       return;
     }
 
@@ -414,7 +423,8 @@ export function StudentsPage() {
         name: `${newStudentData.firstName} ${newStudentData.lastName}`,
         course: newStudentData.course,
         yearLevel: newStudentData.yearLevel,
-        isRegistered: true
+        isRegistered: true,
+        email: trimmedEmail
       }); // Debug log
       
       await studentService.createStudent({
@@ -422,7 +432,8 @@ export function StudentsPage() {
         name: `${newStudentData.firstName} ${newStudentData.lastName}`,
         course: newStudentData.course,
         yearLevel: newStudentData.yearLevel,
-        isRegistered: true
+        isRegistered: true,
+        email: trimmedEmail
       });
 
       // Refresh the students list
@@ -873,6 +884,19 @@ export function StudentsPage() {
                 </div>
               </div>
 
+              {/* Student Barcode */}
+              {selectedStudent && (
+                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Student ID Barcode</h3>
+                  <div className="flex justify-center p-4 bg-gray-50 rounded-lg">
+                    <Barcode value={selectedStudent.id} width={2} height={60} />
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground mt-2">
+                    Scan this barcode to quickly identify the student
+                  </p>
+                </div>
+              )}
+
               {/* Transaction Summary & Status */}
               <div className="bg-white border border-gray-200 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-3">
@@ -1153,7 +1177,7 @@ export function StudentsPage() {
               </div>
               
               <div>
-                <Label htmlFor="new-student-email" className="text-sm font-medium">Email (Optional)</Label>
+                <Label htmlFor="new-student-email" className="text-sm font-medium">Email *</Label>
                 <Input
                   id="new-student-email"
                   type="email"

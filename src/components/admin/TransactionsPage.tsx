@@ -46,7 +46,6 @@ export function TransactionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 7;
 
-
   useEffect(() => {
     const loadTransactions = async () => {
       try {

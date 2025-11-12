@@ -3,11 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, PhilippinePeso, ShoppingCart, Clock, CreditCard, CheckCircle } from 'lucide-react';
+import { TrendingUp, PhilippinePeso, ShoppingCart, CreditCard, CheckCircle, Wallet } from 'lucide-react';
 import { transactionService, studentService } from '@/lib/services';
 import { getUpcomingDuePayments, getDueDateCountdown, getPaymentAlarmLevel } from '@/lib/paymentTracking';
 import { format } from 'date-fns';
 import { DottedSeparator } from '../ui/dotted-line';
+import { Barcode } from '@/components/ui/barcode';
 
 interface Transaction {
   id: string;
@@ -36,10 +37,12 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [studentInfo, setStudentInfo] = useState<{
     loyalty: number;
+    cash: number;
     isActive: boolean;
     canMakeTransactions: boolean;
   }>({
     loyalty: 50,
+    cash: 0,
     isActive: true,
     canMakeTransactions: true
   });
@@ -118,6 +121,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           const studentInfo = await studentService.getStudent(studentData.id);
           setStudentInfo({
             loyalty: studentInfo.loyalty || 50,
+            cash: studentInfo.cash || 0,
             isActive: studentInfo.isActive !== false, // Default to true if not set
             canMakeTransactions: studentInfo.loyalty >= 50 // Can make transactions if loyalty >= 50
           });
@@ -126,6 +130,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           // Fallback to default values
           setStudentInfo({
             loyalty: 50,
+            cash: 0,
             isActive: true,
             canMakeTransactions: true
           });
@@ -345,18 +350,50 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         </div>
       )}
 
-      {/* Welcome Header */}
-      <div className="flex items-center justify-between">
-        <div className='flex flex-col gap-1 sm:gap-2'>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-500">Welcome back, {studentData.name}!</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-           <span>Student ID:</span> {studentData.studentId}
-          </p>
-        </div>
-      </div>
+      {/* Welcome Header Card */}
+      <Card className="bg-gradient-to-br from-green-50 via-white to-green-50/50 border border-green-200/50 shadow-sm overflow-hidden">
+        <CardContent className="p-6 sm:p-8">
+          <div className="flex items-center justify-between gap-6">
+            <div className="flex flex-col gap-3 flex-1">
+              <div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1">
+                  Welcome back, {studentData.name.split(' ')[0]}!
+                </h1>
+                <p className="text-sm sm:text-base text-gray-500 font-medium">
+                  Student ID: <span className="text-green-600 font-semibold">{studentData.studentId}</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex-shrink-0 flex items-center">
+              <Barcode 
+                value={studentData.studentId} 
+                width={1.2} 
+                height={45} 
+                showActions={false}
+                plain={true}
+                className="opacity-90"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
+        <Card className='bg-green-500'>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium text-white">Cash Balance</CardTitle>
+            <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white" />
+          </CardHeader>
+          <CardContent className="p-3 sm:p-6 pt-0">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">₱{studentInfo.cash.toFixed(2)}</div>
+            <DottedSeparator className='my-1 sm:my-2'/>
+            <p className="text-xs text-muted-foreground text-white">
+              Available cash
+            </p>
+          </CardContent>
+        </Card>
+
         <Card className='bg-green-500'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-white">Total Spent</CardTitle>
@@ -393,21 +430,6 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">₱{averageTransaction.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground text-white">
               Per transaction
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className='bg-green-500'>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-white">Last Transaction</CardTitle>
-            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
-              {transactions.length > 0 ? formatDate(transactions[0].timestamp) : 'Never'}
-            </div>
-            <p className="text-xs text-muted-foreground text-white">
-              Most recent purchase
             </p>
           </CardContent>
         </Card>

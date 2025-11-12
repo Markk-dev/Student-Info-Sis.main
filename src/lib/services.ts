@@ -52,6 +52,7 @@ export const authService = {
           course: studentData.course,
           yearLevel: studentData.yearLevel,
           balance: 0,
+          cash: 0,
           loyalty: 25, // Automatic 25 loyalty points for new students
           isActive: true
         }
@@ -212,6 +213,7 @@ export const studentService = {
     course: string;
     yearLevel: string;
     isRegistered: boolean;
+    email?: string;
   }) {
     try {
       // Check if student ID already exists
@@ -228,15 +230,18 @@ export const studentService = {
       const [firstName, ...lastNameParts] = data.name.split(' ');
       const lastName = lastNameParts.join(' ') || 'Unknown';
 
+      const providedEmail = data.email?.trim();
+
       const studentData = {
         studentId: data.id,
         firstName: firstName,
         lastName: lastName,
-        email: `${data.id}@quickregister.local`, // Use a placeholder email for quick registration
+        email: providedEmail && providedEmail.length > 0 ? providedEmail : `${data.id}@quickregister.local`,
         password: 'default123', // Default password
         course: data.course,
         yearLevel: data.yearLevel,
         balance: 0,
+        cash: 0,
         loyalty: 25, // Automatic 25 loyalty points for new students
         isActive: true
       };

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Users, TrendingUp, TrendingDown, PhilippinePeso, ShoppingCart, Settings, Target, RefreshCw, Clock  } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, PhilippinePeso, ShoppingCart, Settings, Target, RefreshCw, Clock, Download } from 'lucide-react';
 import { studentService, transactionService } from '@/lib/services';
 import { format, subDays, startOfDay, endOfDay, getHours } from 'date-fns';
 import { toast } from 'sonner';
@@ -15,19 +15,36 @@ import { DailyJobProcessor } from './DailyJobProcessor';
 
 const COLORS = ['#14a800', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6'];
 
+type DashboardStats = {
+  totalStudents: number;
+  activeStudentsToday: number;
+  activeStudentsWeek: number;
+  dailyRevenue: number;
+  yesterdayRevenue: number;
+  weeklyRevenue: number;
+  lastWeekRevenue: number;
+  monthlyRevenue: number;
+  totalTransactions: number;
+  dailyTransactions: number;
+  weeklyTransactions: number;
+  yesterdayTransactions: number;
+  averageTransaction: number;
+};
+
 export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [monthlyTarget, setMonthlyTarget] = useState(() => {
-    
+
     const saved = localStorage.getItem('monthlyTarget');
-    return saved ? parseFloat(saved) : 50000; 
+    return saved ? parseFloat(saved) : 50000;
   });
   const [showTargetDialog, setShowTargetDialog] = useState(false);
   const [newTarget, setNewTarget] = useState('');
   const [isMaintenance, setIsMaintenance] = useState(false);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
     activeStudentsToday: 0,
+    activeStudentsWeek: 0,
     dailyRevenue: 0,
     yesterdayRevenue: 0,
     weeklyRevenue: 0,
@@ -35,12 +52,17 @@ export function AdminDashboard() {
     monthlyRevenue: 0,
     totalTransactions: 0,
     dailyTransactions: 0,
+    weeklyTransactions: 0,
     yesterdayTransactions: 0,
     averageTransaction: 0
   });
-  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<{ name: string; date: string; revenue: number }[]>([]);
   const [courseData, setCourseData] = useState<any[]>([]);
+  const [courseDataToday, setCourseDataToday] = useState<{ name: string; transactions: number; revenue: number }[]>([]);
+  const [courseDataWeek, setCourseDataWeek] = useState<{ name: string; transactions: number; revenue: number }[]>([]);
   const [peakHoursData, setPeakHoursData] = useState<any[]>([]);
+  const [peakHourToday, setPeakHourToday] = useState('N/A');
+  const [peakHourTodayCount, setPeakHourTodayCount] = useState(0);
   const [recentSales, setRecentSales] = useState<any[]>([]);
 
   const handleSetMonthlyTarget = () => {
@@ -50,7 +72,7 @@ export function AdminDashboard() {
       return;
     }
     setMonthlyTarget(target);
-    
+
     localStorage.setItem('monthlyTarget', target.toString());
     setShowTargetDialog(false);
     setNewTarget('');
@@ -58,322 +80,430 @@ export function AdminDashboard() {
   };
 
   const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      
       try {
-        setLoading(true);
-        
-        // Check maintenance mode
-        try {
-          const { settingsService } = await import('@/lib/services');
-          const maintenanceStatus = await settingsService.isSystemInMaintenance();
-          setIsMaintenance(maintenanceStatus);
-        } catch (error) {
-          console.error('Error checking maintenance status:', error);
-        }
-        
-        // Load admins/cashiers
-        const [studentsResponse, transactionsResponse] = await Promise.all([
-          studentService.getStudents(),
-          transactionService.getTransactions()
-        ]);
-
-        const students = studentsResponse.documents;
-        const transactions = transactionsResponse.documents;
-        // const products = productsResponse.documents;
-
-        
-        const studentsMap = new Map();
-        students.forEach((student: any) => {
-          studentsMap.set(student.studentId, student);
-        });
-
-        
-        const transformedTransactions = transactions.map((txn: any) => {
-          const student = studentsMap.get(txn.studentId);
-          
-          
-          let timestamp: Date;
-          try {
-            // Appwrite stores timestamps in ISO format, parse directly
-            timestamp = new Date(txn.$createdAt || txn.createdAt);
-            if (isNaN(timestamp.getTime())) {
-              console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
-              timestamp = new Date(); 
-            }
-          } catch (error) {
-            console.warn('Error parsing timestamp for transaction:', txn.$id, error);
-            timestamp = new Date(); 
-          }
-          
-          return {
-            id: txn.$id,
-            studentId: txn.studentId,
-            studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
-            course: student ? student.course : 'Unknown',
-            amount: txn.amount,
-            transactionAmount: txn.transactionAmount,
-            itemPrices: txn.itemPrices,
-            totalItemAmount: txn.totalItemAmount,
-            timestamp: timestamp,
-            cashier: txn.cashierId || 'Admin',
-            status: txn.status || 'completed',
-          };
-        });
-
-        
-        const totalStudents = students.length;
-        const totalTransactions = transformedTransactions.length;
-        const totalRevenue = transformedTransactions
-          .filter((txn: any) => txn.status !== 'Credit')
-          .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
-        const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
-
-        
-        const today = new Date();
-        const todayStart = startOfDay(today);
-        const todayEnd = endOfDay(today);
-        const dailyRevenue = transformedTransactions
-          .filter((txn: any) => {
-            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= todayStart && txn.timestamp <= todayEnd && txn.status !== 'Credit';
-          })
-          .reduce((sum: number, txn: any) => {
-            // For revenue, use the actual money received (transactionAmount)
-            // For paid transactions, use totalItemAmount
-            // For partial transactions, use transactionAmount (actual money received)
-            if (txn.status === 'Partial') {
-              return sum + (txn.transactionAmount || 0);
-            } else {
-              return sum + (txn.totalItemAmount || 0);
-            }
-          }, 0);
-
-        
-        const dailyTransactions = transformedTransactions
-          .filter((txn: any) => {
-            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= todayStart && txn.timestamp <= todayEnd && txn.status !== 'Credit';
-          }).length;
-
-        
-        const yesterday = subDays(today, 1);
-        const yesterdayStart = startOfDay(yesterday);
-        const yesterdayEnd = endOfDay(yesterday);
-        const yesterdayRevenue = transformedTransactions
-          .filter((txn: any) => {
-            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd && txn.status !== 'Credit';
-          })
-          .reduce((sum: number, txn: any) => {
-            // For revenue, use the actual money received (transactionAmount)
-            if (txn.status === 'Partial') {
-              return sum + (txn.transactionAmount || 0);
-            } else {
-              return sum + (txn.totalItemAmount || 0);
-            }
-          }, 0);
-
-        
-        const yesterdayTransactions = transformedTransactions
-          .filter((txn: any) => {
-            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd && txn.status !== 'Credit';
-          }).length;
-
-        
-        const weekAgo = subDays(today, 7);
-        const weeklyRevenue = transformedTransactions
-          .filter((txn: any) => {
-            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= weekAgo && txn.status !== 'Credit';
-          })
-          .reduce((sum: number, txn: any) => {
-            // For revenue, use the actual money received (transactionAmount)
-            if (txn.status === 'Partial') {
-              return sum + (txn.transactionAmount || 0);
-            } else {
-              return sum + (txn.totalItemAmount || 0);
-            }
-          }, 0);
-
-        
-        const lastWeekStart = subDays(today, 14);
-        const lastWeekEnd = subDays(today, 8);
-        const lastWeekRevenue = transformedTransactions
-          .filter((txn: any) => {
-            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= lastWeekStart && txn.timestamp <= lastWeekEnd && txn.status !== 'Credit';
-          })
-          .reduce((sum: number, txn: any) => {
-            // For revenue, use the actual money received (transactionAmount)
-            if (txn.status === 'Partial') {
-              return sum + (txn.transactionAmount || 0);
-            } else {
-              return sum + (txn.totalItemAmount || 0);
-            }
-          }, 0);
-
-        
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        const monthlyRevenue = transformedTransactions
-          .filter((txn: any) => {
-            if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-            return txn.timestamp >= monthStart && txn.status !== 'Credit';
-          })
-          .reduce((sum: number, txn: any) => {
-            // For revenue, use the actual money received (transactionAmount)
-            if (txn.status === 'Partial') {
-              return sum + (txn.transactionAmount || 0);
-            } else {
-              return sum + (txn.totalItemAmount || 0);
-            }
-          }, 0);
-
-        
-        // Active students count - using same logic as StudentsPage
-        const activeStudents = students.filter((student: any) => {
-          if (!student.isActive) {
-            return false; // Suspended students are not active
-          }
-          
-          // Check if student has made at least 3 transactions in the past 3 days
-          const threeDaysAgo = new Date();
-          threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-          
-          const studentTransactions = transformedTransactions.filter((txn: any) => 
-            txn.studentId === student.studentId
-          );
-          
-          const recentTransactions = studentTransactions.filter((txn: any) => {
-            try {
-              return txn.timestamp && !isNaN(txn.timestamp.getTime()) && txn.timestamp >= threeDaysAgo;
-            } catch (error) {
-              return false;
-            }
-          });
-          
-          return recentTransactions.length >= 3;
-        }).length;
-
-        setStats({
-          totalStudents,
-          activeStudentsToday: activeStudents,
-          dailyRevenue,
-          yesterdayRevenue,
-          weeklyRevenue,
-          lastWeekRevenue,
-          monthlyRevenue,
-          totalTransactions,
-          dailyTransactions,
-          yesterdayTransactions,
-          averageTransaction
-        });
-
-        
-        const revenueData = [];
-        for (let i = 6; i >= 0; i--) {
-          const date = subDays(today, i);
-          const dayStart = startOfDay(date);
-          const dayEnd = endOfDay(date);
-          
-          const dayRevenue = transformedTransactions
-            .filter((txn: any) => {
-              if (!txn.timestamp || isNaN(txn.timestamp.getTime())) return false;
-              return txn.timestamp >= dayStart && txn.timestamp <= dayEnd && txn.status !== 'Credit';
-            })
-            .reduce((sum: number, txn: any) => {
-              // For revenue, use the actual money received (transactionAmount)
-              if (txn.status === 'Partial') {
-                return sum + (txn.transactionAmount || 0);
-              } else {
-                return sum + (txn.totalItemAmount || 0);
-              }
-            }, 0);
-
-          revenueData.push({
-            name: format(date, 'EEE'),
-            revenue: parseFloat(dayRevenue.toFixed(2))
-          });
-        }
-        setRevenueData(revenueData);
-
-        
-        const courseMap = new Map<string, number>();
-        transformedTransactions.forEach((txn: any) => {
-          const course = txn.course;
-          courseMap.set(course, (courseMap.get(course) || 0) + 1);
-        });
-
-        const courseData = Array.from(courseMap.entries())
-          .map(([course, count]) => ({
-            name: course,
-            purchases: count,
-            percentage: Math.round((count / totalTransactions) * 100)
-          }))
-          .sort((a, b) => b.purchases - a.purchases)
-          .slice(0, 5);
-
-        setCourseData(courseData);
-
-        
-        const hourMap = new Map<number, number>();
-        for (let i = 0; i < 24; i++) {
-          hourMap.set(i, 0);
-        }
-
-        transformedTransactions.forEach((txn: any) => {
-          if (txn.timestamp && !isNaN(txn.timestamp.getTime())) {
-            const hour = getHours(txn.timestamp);
-            hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
-          }
-        });
-
-        const peakHoursData = Array.from(hourMap.entries())
-          .map(([hour, count]) => ({
-            time: `${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'PM' : 'AM'}`,
-            transactions: count
-          }))
-          .sort((a, b) => {
-            const hourA = parseInt(a.time.replace(/\D/g, ''));
-            const hourB = parseInt(b.time.replace(/\D/g, ''));
-            return hourA - hourB;
-          });
-
-        setPeakHoursData(peakHoursData);
-
-        
-        // Sort transactions by timestamp (newest first), then by ID as fallback
-        const sortedTransactions = transformedTransactions.sort((a, b) => {
-          const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
-          if (timeDiff !== 0) return timeDiff;
-          // If timestamps are the same, sort by ID (newer IDs come first)
-          return b.id.localeCompare(a.id);
-        });
-        
-        const recentSales = sortedTransactions
-          .slice(0, 4)
-          .map((txn: any) => ({
-            id: txn.id,
-            studentId: txn.studentId,
-            name: txn.studentName,
-            amount: txn.amount,
-            time: format(txn.timestamp, 'MMM dd, HH:mm'),
-            course: txn.course.substring(0, 3).toUpperCase()
-          }));
-
-        setRecentSales(recentSales);
-
+        const { settingsService } = await import('@/lib/services');
+        const maintenanceStatus = await settingsService.isSystemInMaintenance();
+        setIsMaintenance(maintenanceStatus);
       } catch (error) {
-        console.error('Error loading dashboard data:', error);
-      } finally {
-        setLoading(false);
+        console.error('Error checking maintenance status:', error);
       }
+
+      
+      const [studentsResponse, transactionsResponse] = await Promise.all([
+        studentService.getStudents(),
+        transactionService.getTransactions()
+      ]);
+
+      const students = studentsResponse.documents;
+      const transactions = transactionsResponse.documents;
+      
+
+
+      const studentsMap = new Map();
+      students.forEach((student: any) => {
+        studentsMap.set(student.studentId, student);
+      });
+
+
+      const transformedTransactions = transactions.map((txn: any) => {
+        const student = studentsMap.get(txn.studentId);
+
+        let timestamp: Date;
+        try {
+          
+          timestamp = new Date(txn.$createdAt || txn.createdAt);
+          if (isNaN(timestamp.getTime())) {
+            console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
+            timestamp = new Date();
+          }
+        } catch (error) {
+          console.warn('Error parsing timestamp for transaction:', txn.$id, error);
+          timestamp = new Date();
+        }
+
+        return {
+          id: txn.$id,
+          studentId: txn.studentId,
+          studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown Student',
+          course: student ? student.course : 'Unknown',
+          amount: txn.amount,
+          transactionAmount: txn.transactionAmount,
+          itemPrices: txn.itemPrices,
+          totalItemAmount: txn.totalItemAmount,
+          timestamp: timestamp,
+          cashier: txn.cashierId || 'Admin',
+          status: txn.status || 'completed',
+        };
+      });
+
+      const getTransactionRevenue = (txn: any) => {
+        if (txn.status === 'Partial') {
+          return txn.transactionAmount || 0;
+        }
+        return txn.totalItemAmount || 0;
+      };
+
+      const isValidRevenueTransaction = (txn: any) =>
+        txn.timestamp && !isNaN(txn.timestamp.getTime()) && txn.status !== 'Credit';
+
+
+      const totalStudents = students.length;
+      const totalTransactions = transformedTransactions.length;
+      const totalRevenue = transformedTransactions
+        .filter((txn: any) => txn.status !== 'Credit')
+        .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+      const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+
+
+      const today = new Date();
+      const todayStart = startOfDay(today);
+      const todayEnd = endOfDay(today);
+      const transactionsToday = transformedTransactions.filter((txn: any) => {
+        if (!isValidRevenueTransaction(txn)) return false;
+        return txn.timestamp >= todayStart && txn.timestamp <= todayEnd;
+      });
+      const dailyRevenue = transactionsToday.reduce(
+        (sum: number, txn: any) => sum + getTransactionRevenue(txn),
+        0
+      );
+      const dailyTransactions = transactionsToday.length;
+
+
+      const yesterday = subDays(today, 1);
+      const yesterdayStart = startOfDay(yesterday);
+      const yesterdayEnd = endOfDay(yesterday);
+      const transactionsYesterday = transformedTransactions.filter((txn: any) => {
+        if (!isValidRevenueTransaction(txn)) return false;
+        return txn.timestamp >= yesterdayStart && txn.timestamp <= yesterdayEnd;
+      });
+      const yesterdayRevenue = transactionsYesterday.reduce(
+        (sum: number, txn: any) => sum + getTransactionRevenue(txn),
+        0
+      );
+      const yesterdayTransactions = transactionsYesterday.length;
+
+
+      const weekAgo = subDays(today, 7);
+      const transactionsThisWeek = transformedTransactions.filter((txn: any) => {
+        if (!isValidRevenueTransaction(txn)) return false;
+        return txn.timestamp >= weekAgo;
+      });
+      const weeklyRevenue = transactionsThisWeek.reduce(
+        (sum: number, txn: any) => sum + getTransactionRevenue(txn),
+        0
+      );
+      const weeklyTransactions = transactionsThisWeek.length;
+
+
+      const lastWeekStart = subDays(today, 14);
+      const lastWeekEnd = subDays(today, 8);
+      const transactionsLastWeek = transformedTransactions.filter((txn: any) => {
+        if (!isValidRevenueTransaction(txn)) return false;
+        return txn.timestamp >= lastWeekStart && txn.timestamp <= lastWeekEnd;
+      });
+      const lastWeekRevenue = transactionsLastWeek.reduce(
+        (sum: number, txn: any) => sum + getTransactionRevenue(txn),
+        0
+      );
+
+
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const transactionsThisMonth = transformedTransactions.filter((txn: any) => {
+        if (!isValidRevenueTransaction(txn)) return false;
+        return txn.timestamp >= monthStart;
+      });
+      const monthlyRevenue = transactionsThisMonth.reduce(
+        (sum: number, txn: any) => sum + getTransactionRevenue(txn),
+        0
+      );
+
+
+      
+      const activeStudents = students.filter((student: any) => {
+        if (!student.isActive) {
+          return false; 
+        }
+
+        
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+        const studentTransactions = transformedTransactions.filter((txn: any) =>
+          txn.studentId === student.studentId
+        );
+
+        const recentTransactions = studentTransactions.filter((txn: any) => {
+          try {
+            return txn.timestamp && !isNaN(txn.timestamp.getTime()) && txn.timestamp >= threeDaysAgo;
+          } catch (error) {
+            return false;
+          }
+        });
+
+        return recentTransactions.length >= 3;
+      }).length;
+
+      const activeStudentsWeek = students.filter((student: any) => {
+        if (!student.isActive) {
+          return false;
+        }
+
+        return transactionsThisWeek.some((txn: any) => txn.studentId === student.studentId);
+      }).length;
+
+      setStats({
+        totalStudents,
+        activeStudentsToday: activeStudents,
+        activeStudentsWeek,
+        dailyRevenue,
+        yesterdayRevenue,
+        weeklyRevenue,
+        lastWeekRevenue,
+        monthlyRevenue,
+        totalTransactions,
+        dailyTransactions,
+        weeklyTransactions,
+        yesterdayTransactions,
+        averageTransaction
+      });
+
+
+      const revenueData = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = subDays(today, i);
+        const dayStart = startOfDay(date);
+        const dayEnd = endOfDay(date);
+
+        const dayTransactions = transformedTransactions.filter((txn: any) => {
+          if (!isValidRevenueTransaction(txn)) return false;
+          return txn.timestamp >= dayStart && txn.timestamp <= dayEnd;
+        });
+        const dayRevenue = dayTransactions.reduce(
+          (sum: number, txn: any) => sum + getTransactionRevenue(txn),
+          0
+        );
+
+        revenueData.push({
+          name: format(date, 'EEE'),
+          date: format(date, 'yyyy-MM-dd'),
+          revenue: parseFloat(dayRevenue.toFixed(2))
+        });
+      }
+      setRevenueData(revenueData);
+
+
+      const calculateCourseStats = (txns: any[]) => {
+        const courseMap = new Map<string, { count: number; revenue: number }>();
+
+        txns.forEach((txn: any) => {
+          const course = txn.course || 'Unknown';
+          const existing = courseMap.get(course) || { count: 0, revenue: 0 };
+          courseMap.set(course, {
+            count: existing.count + 1,
+            revenue: existing.revenue + getTransactionRevenue(txn)
+          });
+        });
+
+        return Array.from(courseMap.entries()).map(([name, data]) => ({
+          name,
+          transactions: data.count,
+          revenue: parseFloat(data.revenue.toFixed(2))
+        }));
+      };
+
+      const overallCourseStats = calculateCourseStats(
+        transformedTransactions.filter((txn: any) => txn.status !== 'Credit')
+      );
+      const totalCourseTransactions = overallCourseStats.reduce((sum, item) => sum + item.transactions, 0);
+      const courseData = overallCourseStats
+        .map((item) => ({
+          name: item.name,
+          purchases: item.transactions,
+          percentage: totalCourseTransactions > 0
+            ? Math.round((item.transactions / totalCourseTransactions) * 100)
+            : 0
+        }))
+        .sort((a, b) => b.purchases - a.purchases)
+        .slice(0, 5);
+
+      setCourseData(courseData);
+      setCourseDataToday(calculateCourseStats(transactionsToday));
+      setCourseDataWeek(calculateCourseStats(transactionsThisWeek));
+
+
+      const hourMap = new Map<number, number>();
+      for (let i = 0; i < 24; i++) {
+        hourMap.set(i, 0);
+      }
+
+      transformedTransactions.forEach((txn: any) => {
+        if (txn.timestamp && !isNaN(txn.timestamp.getTime())) {
+          const hour = getHours(txn.timestamp);
+          hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
+        }
+      });
+
+      const peakHoursData = Array.from(hourMap.entries())
+        .map(([hour, count]) => ({
+          time: `${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'PM' : 'AM'}`,
+          transactions: count
+        }))
+        .sort((a, b) => {
+          const hourA = parseInt(a.time.replace(/\D/g, ''));
+          const hourB = parseInt(b.time.replace(/\D/g, ''));
+          return hourA - hourB;
+        });
+
+      setPeakHoursData(peakHoursData);
+
+      const todayHourMap = new Map<number, number>();
+      for (let i = 0; i < 24; i++) {
+        todayHourMap.set(i, 0);
+      }
+
+      transactionsToday.forEach((txn: any) => {
+        if (txn.timestamp && !isNaN(txn.timestamp.getTime())) {
+          const hour = getHours(txn.timestamp);
+          todayHourMap.set(hour, (todayHourMap.get(hour) || 0) + 1);
+        }
+      });
+
+      const formatHourLabel = (hour: number) => {
+        const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+        const period = hour >= 12 ? 'PM' : 'AM';
+        return `${displayHour}${period}`;
+      };
+
+      let peakHourLabel = 'N/A';
+      let peakHourCount = 0;
+      todayHourMap.forEach((count, hour) => {
+        if (count > peakHourCount) {
+          peakHourCount = count;
+          peakHourLabel = formatHourLabel(hour);
+        }
+      });
+
+      if (peakHourCount === 0) {
+        peakHourLabel = 'N/A';
+      }
+
+      setPeakHourToday(peakHourLabel);
+      setPeakHourTodayCount(peakHourCount);
+
+
+      
+      const sortedTransactions = transformedTransactions.sort((a, b) => {
+        const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+        if (timeDiff !== 0) return timeDiff;
+        
+        return b.id.localeCompare(a.id);
+      });
+
+      const recentSales = sortedTransactions
+        .slice(0, 4)
+        .map((txn: any) => ({
+          id: txn.id,
+          studentId: txn.studentId,
+          name: txn.studentName,
+          amount: txn.amount,
+          time: format(txn.timestamp, 'MMM dd, HH:mm'),
+          course: txn.course.substring(0, 3).toUpperCase()
+        }));
+
+      setRecentSales(recentSales);
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportSales = () => {
+    if (loading) {
+      toast.error('Dashboard data is still loading');
+      return;
+    }
+
+    const rows: string[] = [];
+    const wrap = (value: string | number) => {
+      const str = value === undefined || value === null ? '' : value.toString();
+      const escaped = str.replace(/"/g, '""');
+      return `"${escaped}"`;
     };
+
+    const appendRow = (values: (string | number)[]) => {
+      const normalised = values.map((value) => {
+        if (typeof value === 'number' && !Number.isFinite(value)) {
+          return '';
+        }
+        return value;
+      });
+      rows.push(normalised.map(wrap).join(','));
+    };
+
+    const formatNumber = (amount: number) => amount.toFixed(2);
+
+    rows.push(wrap('Summary'));
+    appendRow(['Metric', 'Value']);
+    appendRow(['Total Active Students This Week', stats.activeStudentsWeek]);
+    appendRow(['Todays Revenue', formatNumber(stats.dailyRevenue)]);
+    appendRow(['This Weeks Revenue', formatNumber(stats.weeklyRevenue)]);
+    appendRow(['Total Transactions Today', stats.dailyTransactions]);
+    appendRow(['Total Transactions This Week', stats.weeklyTransactions]);
+    appendRow(['Average Transaction Value', formatNumber(stats.averageTransaction)]);
+    appendRow(['Peak Transaction Hour Today', peakHourToday]);
+    appendRow(['Transactions During Peak Hour Today', peakHourTodayCount]);
+    rows.push('');
+
+    rows.push(wrap('Daily Revenue (Past 7 Days)'));
+    appendRow(['Date', 'Revenue']);
+    revenueData.forEach((day) => {
+      appendRow([day.date, formatNumber(day.revenue)]);
+    });
+    rows.push('');
+
+    rows.push(wrap('Transactions by Course (Today)'));
+    appendRow(['Course', 'Transactions', 'Revenue']);
+    if (courseDataToday.length === 0) {
+      appendRow(['No data', 0, formatNumber(0)]);
+    } else {
+      courseDataToday.forEach((course) => {
+        appendRow([course.name, course.transactions, formatNumber(course.revenue)]);
+      });
+    }
+    rows.push('');
+
+    rows.push(wrap('Transactions by Course (This Week)'));
+    appendRow(['Course', 'Transactions', 'Revenue']);
+    if (courseDataWeek.length === 0) {
+      appendRow(['No data', 0, formatNumber(0)]);
+    } else {
+      courseDataWeek.forEach((course) => {
+        appendRow([course.name, course.transactions, formatNumber(course.revenue)]);
+      });
+    }
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dashboard_metrics_${format(new Date(), 'yyyy-MM-dd_HH-mm-ss')}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast.success('Dashboard data exported');
+  };
 
   useEffect(() => {
     loadDashboardData();
   }, []);
 
-  // Refresh dashboard when window regains focus (e.g., when returning from transaction page)
+  
   useEffect(() => {
     const handleFocus = () => {
       loadDashboardData();
@@ -383,7 +513,7 @@ export function AdminDashboard() {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Listen for new transaction events and refresh dashboard
+  
   useEffect(() => {
     const handleTransactionCreated = () => {
       console.log('TransactionCreated event received, refreshing dashboard...');
@@ -413,15 +543,26 @@ export function AdminDashboard() {
           <h1 className="text-xl md:text-2xl font-bold">Admin Dashboard</h1>
           <p className="text-sm text-muted-foreground">Overview of your student information system</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => loadDashboardData()}
-          disabled={loading}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExportSales}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export Sales</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => loadDashboardData()}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -437,8 +578,8 @@ export function AdminDashboard() {
               <span>{stats.activeStudentsToday} active</span>
               <span>{stats.totalStudents > 0 ? Math.round((stats.activeStudentsToday / stats.totalStudents) * 100) : 0}%</span>
             </div>
-            <Progress 
-              value={stats.totalStudents > 0 ? (stats.activeStudentsToday / stats.totalStudents) * 100 : 0} 
+            <Progress
+              value={stats.totalStudents > 0 ? (stats.activeStudentsToday / stats.totalStudents) * 100 : 0}
               className="h-2"
             />
           </CardContent>
@@ -453,16 +594,15 @@ export function AdminDashboard() {
             <div className="text-xl md:text-2xl font-bold">₱{stats.dailyRevenue.toFixed(2)}</div>
             <DottedSeparator className="my-2" />
             <div className="space-y-1">
-              <div className={`flex items-center gap-1 text-xs md:text-sm ${
-                stats.dailyRevenue >= stats.yesterdayRevenue ? 'text-green-600' : 'text-red-600'
-              }`}>
+              <div className={`flex items-center gap-1 text-xs md:text-sm ${stats.dailyRevenue >= stats.yesterdayRevenue ? 'text-green-600' : 'text-red-600'
+                }`}>
                 {stats.dailyRevenue >= stats.yesterdayRevenue ? (
                   <TrendingUp className="h-4 w-4" />
                 ) : (
                   <TrendingDown className="h-4 w-4" />
                 )}
                 <span className="truncate">
-                  {stats.yesterdayRevenue > 0 ? 
+                  {stats.yesterdayRevenue > 0 ?
                     `${Math.abs(((stats.dailyRevenue - stats.yesterdayRevenue) / stats.yesterdayRevenue) * 100).toFixed(0)}% from yesterday` :
                     '0% from yesterday'
                   }
@@ -480,16 +620,15 @@ export function AdminDashboard() {
           <CardContent>
             <div className="text-xl md:text-2xl font-bold">₱{stats.weeklyRevenue.toFixed(2)}</div>
             <DottedSeparator className="my-2" />
-            <div className={`flex items-center gap-1 text-xs md:text-sm ${
-              stats.weeklyRevenue >= stats.lastWeekRevenue ? 'text-green-600' : 'text-red-600'
-            }`}>
+            <div className={`flex items-center gap-1 text-xs md:text-sm ${stats.weeklyRevenue >= stats.lastWeekRevenue ? 'text-green-600' : 'text-red-600'
+              }`}>
               {stats.weeklyRevenue >= stats.lastWeekRevenue ? (
                 <TrendingUp className="h-4 w-4" />
               ) : (
                 <TrendingDown className="h-4 w-4" />
               )}
               <span className="truncate">
-                {stats.lastWeekRevenue > 0 ? 
+                {stats.lastWeekRevenue > 0 ?
                   `${Math.abs(((stats.weeklyRevenue - stats.lastWeekRevenue) / stats.lastWeekRevenue) * 100).toFixed(0)}% from last week` :
                   '0% from last week'
                 }
@@ -506,16 +645,15 @@ export function AdminDashboard() {
           <CardContent>
             <div className="text-xl md:text-2xl font-bold">{stats.totalTransactions}</div>
             <DottedSeparator className="my-2" />
-            <div className={`flex items-center gap-1 text-xs md:text-sm ${
-              stats.dailyTransactions >= stats.yesterdayTransactions ? 'text-green-600' : 'text-red-600'
-            }`}>
+            <div className={`flex items-center gap-1 text-xs md:text-sm ${stats.dailyTransactions >= stats.yesterdayTransactions ? 'text-green-600' : 'text-red-600'
+              }`}>
               {stats.dailyTransactions >= stats.yesterdayTransactions ? (
                 <TrendingUp className="h-4 w-4" />
               ) : (
                 <TrendingDown className="h-4 w-4" />
               )}
               <span className="truncate">
-                {stats.yesterdayTransactions > 0 ? 
+                {stats.yesterdayTransactions > 0 ?
                   `${Math.abs(((stats.dailyTransactions - stats.yesterdayTransactions) / stats.yesterdayTransactions) * 100).toFixed(0)}% from yesterday` :
                   '0% from yesterday'
                 }
@@ -572,7 +710,7 @@ export function AdminDashboard() {
                     <Tooltip formatter={(value) => [value, 'Transactions']} />
                   </PieChart>
                 </ResponsiveContainer>
-                
+
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-foreground">
@@ -588,8 +726,8 @@ export function AdminDashboard() {
                 {courseData.map((entry, index) => (
                   <div key={entry.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <div 
-                        className="w-2.5 h-2.5 rounded-full" 
+                      <div
+                        className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: COLORS[index % COLORS.length] }}
                       />
                       <span className="font-medium">{entry.name}</span>
@@ -618,10 +756,10 @@ export function AdminDashboard() {
               <div className="relative z-30 flex flex-1 flex-col justify-center gap-1 border-t px-4 py-3 text-left sm:border-t-0 sm:px-6 sm:py-4 bg-muted/50">
                 <span className="text-muted-foreground text-xs">Peak Hour</span>
                 <span className="text-lg leading-none font-bold sm:text-2xl text-primary">
-                {peakHoursData.length > 0 ? 
-                  peakHoursData.find(item => item.transactions === Math.max(...peakHoursData.map(h => h.transactions)))?.time || '' 
-                  : ''
-                }
+                  {peakHoursData.length > 0 ?
+                    peakHoursData.find(item => item.transactions === Math.max(...peakHoursData.map(h => h.transactions)))?.time || ''
+                    : ''
+                  }
                 </span>
               </div>
             </div>
@@ -650,7 +788,7 @@ export function AdminDashboard() {
                   tickMargin={8}
                   tick={{ fontSize: 10 }}
                 />
-                <Tooltip 
+                <Tooltip
                   formatter={(value) => [value, 'Transactions']}
                   contentStyle={{
                     backgroundColor: 'white',
@@ -659,8 +797,8 @@ export function AdminDashboard() {
                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                   }}
                 />
-                <Bar 
-                  dataKey="transactions" 
+                <Bar
+                  dataKey="transactions"
                   fill="#14a800"
                   radius={[4, 4, 0, 0]}
                   className="hover:opacity-80 transition-opacity"
@@ -707,7 +845,7 @@ export function AdminDashboard() {
                   </div>
                 </div>
               ))}
-              
+
               {recentSales.length === 0 && (
                 <div className="text-center py-6">
                   <ShoppingCart className="h-10 w-10 text-muted-foreground mx-auto mb-3" />

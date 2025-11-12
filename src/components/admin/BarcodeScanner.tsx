@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ interface BarcodeScannerProps {
   onAddTransaction: (transaction: any) => void;
 }
 
-// Predefined arrays for courses and year levels - easily modifiable
+
 const COURSES = [
   'BSIT', 'BSCS', 'BSIS', 'BSEMC', 'BSCE', 'BSEE', 'BSME', 'BSIE', 'BSA', 'BSBA',
   'BSHM', 'BSTM', 'BSN', 'BSMT', 'BSRT', 'BSPHARMA', 'BSPHARM',
@@ -55,28 +55,28 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Filtered courses based on search
+  
   const filteredCourses = COURSES.filter(course =>
     course.toLowerCase().includes(courseSearch.toLowerCase())
   );
 
-  // Calculate total from item prices
+  
   const totalItemPrices = itemPrices.reduce((sum, price) => {
     const numPrice = parseFloat(price) || 0;
     return sum + numPrice;
   }, 0);
 
-  // Calculate change (Transaction Amount - Total Item Prices)
+  
   const transactionAmountNum = parseFloat(transactionAmount) || 0;
   const change = transactionAmountNum - totalItemPrices;
 
-  // Dynamic status button disabling logic with loyalty restrictions
+  
   const studentLoyalty = currentStudent?.loyalty || 0;
   const isPaidDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum < totalItemPrices;
   const isPartialDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum >= totalItemPrices || transactionAmountNum === 0 || studentLoyalty < 90;
   const isCreditDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum > 0 || studentLoyalty < 100;
 
-  // Auto-select appropriate status based on conditions and loyalty restrictions
+  
   useEffect(() => {
     if (!currentStudent?.isRegistered || totalItemPrices === 0) {
       setTransactionStatus('');
@@ -86,17 +86,17 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     const studentLoyalty = currentStudent?.loyalty || 0;
 
     if (transactionAmountNum === 0) {
-      // No transaction amount = Credit (only if loyalty >= 100)
+      
       if (studentLoyalty >= 100) {
         setTransactionStatus('Credit');
       } else {
         setTransactionStatus('');
       }
     } else if (transactionAmountNum >= totalItemPrices) {
-      // Sufficient amount = Paid (always available)
+      
       setTransactionStatus('Paid');
     } else if (transactionAmountNum < totalItemPrices) {
-      // Insufficient amount = Partial (only if loyalty >= 90)
+      
       if (studentLoyalty >= 90) {
         setTransactionStatus('Partial');
       } else {
@@ -105,24 +105,24 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     }
   }, [transactionAmountNum, totalItemPrices, currentStudent?.isRegistered, currentStudent?.loyalty]);
 
-  // Add new item price field
+  
   const addItemPrice = () => {
     setItemPrices(prev => [...prev, '']);
   };
 
-  // Update specific item price
+  
   const updateItemPrice = (index: number, value: string) => {
     setItemPrices(prev => prev.map((price, i) => i === index ? value : price));
   };
 
-  // Remove item price
+  
   const removeItemPrice = (index: number) => {
     if (itemPrices.length > 1) {
       setItemPrices(prev => prev.filter((_, i) => i !== index));
     }
   };
 
-  // Close dropdown when clicking outside
+  
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -140,12 +140,10 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     };
   }, [isCourseDropdownOpen]);
 
-  const handleStudentIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setStudentId(e.target.value);
-  };
-
-  const handleScan = async () => {
-    if (!studentId.trim()) {
+  const handleScan = useCallback(async (manualId?: string) => {
+    const id = (manualId || studentId).trim();
+    
+    if (!id) {
       toast.error('Please enter a student ID');
       return;
     }
@@ -153,7 +151,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     try {
       // Get full student data including loyalty points
       const studentsResponse = await studentService.getStudents();
-      const fullStudent = studentsResponse.documents.find((s: any) => s.studentId === studentId.trim());
+      const fullStudent = studentsResponse.documents.find((s: any) => s.studentId === id);
 
       if (fullStudent) {
         const student = {
@@ -168,10 +166,15 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         setCurrentStudent(student);
         setIsNewStudent(false);
         toast.success(`Student found: ${student.firstName} ${student.lastName}`);
+        // Clear input and refocus for next barcode scan
+        setTimeout(() => {
+          setStudentId('');
+          inputRef.current?.focus();
+        }, 300);
       } else {
         // Student not registered yet
         setCurrentStudent({
-          id: studentId.trim(),
+          id: id,
           firstName: '',
           lastName: '',
           course: '',
@@ -181,12 +184,65 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         });
         setIsNewStudent(true);
         toast.warning('Student not registered. Please register them first.');
+        // Clear input and refocus
+        setTimeout(() => {
+          setStudentId('');
+          inputRef.current?.focus();
+        }, 500);
       }
     } catch (error) {
       toast.error('Error finding student.');
       console.error(error);
     }
-  };
+  }, [studentId]);
+
+
+  
+  useEffect(() => {
+    
+    const focusInput = () => {
+      if (inputRef.current && document.activeElement !== inputRef.current) {
+        inputRef.current.focus();
+      }
+    };
+    
+    
+    const timer = setTimeout(focusInput, 100);
+    
+    
+    const handleFocusLoss = () => {
+      
+      setTimeout(() => {
+        if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+          focusInput();
+        }
+      }, 100);
+    };
+    
+    
+    window.addEventListener('focus', focusInput);
+    document.addEventListener('click', handleFocusLoss);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('focus', focusInput);
+      document.removeEventListener('click', handleFocusLoss);
+    };
+  }, []);
+
+  
+  
+  // Handle Enter key in input field (for manual entry)
+  const handleBarcodeInput = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const scannedValue = studentId.trim();
+      if (scannedValue) {
+        console.log('Enter pressed manually - searching for:', scannedValue);
+        handleScan(scannedValue);
+      }
+    }
+  }, [studentId, handleScan]);
 
   const handleRegisterStudent = async () => {
     if (!newStudentData.firstName || !newStudentData.lastName || !newStudentData.course || !newStudentData.yearLevel) {
@@ -194,18 +250,37 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       return;
     }
 
+    // Use currentStudent.id if available, otherwise fall back to studentId
+    const studentIdToUse = currentStudent?.id || studentId.trim();
+    
+    if (!studentIdToUse) {
+      toast.error('Student ID is required');
+      return;
+    }
+
     try {
       const registeredStudent = await studentService.createStudent({
-        id: studentId.trim(),
+        id: studentIdToUse,
         name: `${newStudentData.firstName} ${newStudentData.lastName}`,
         course: newStudentData.course,
         yearLevel: newStudentData.yearLevel,
         isRegistered: true
       });
 
-      setCurrentStudent(registeredStudent);
+      setCurrentStudent({
+        id: registeredStudent.id,
+        firstName: registeredStudent.firstName,
+        lastName: registeredStudent.lastName,
+        course: registeredStudent.course,
+        yearLevel: registeredStudent.yearLevel,
+        loyalty: 25, // New students get 25 loyalty points
+        isRegistered: true
+      });
       setIsNewStudent(false);
       toast.success('Student registered successfully!');
+      
+      // Clear registration form
+      setNewStudentData({ firstName: '', lastName: '', course: '', yearLevel: '' });
     } catch (error: any) {
       console.error('Registration error:', error);
       if (error.message) {
@@ -227,7 +302,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       return;
     }
 
-    // Filter out empty item prices and convert to numbers
+    
     const validItemPrices = itemPrices.filter(price => price.trim() !== '').map(price => parseFloat(price));
     const totalItemAmount = validItemPrices.reduce((sum, price) => sum + price, 0);
 
@@ -236,7 +311,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       return;
     }
 
-    // For credit transactions, transaction amount can be 0 or empty
+    
     if (transactionStatus !== 'Credit') {
       if (!transactionAmount) {
         toast.error('Please enter a transaction amount');
@@ -252,16 +327,16 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
     const amount = parseFloat(transactionAmount) || 0;
 
-    // Calculate final amount based on status
+    
     let finalAmount: number;
     if (transactionStatus === 'Credit') {
-      // For credit transactions, amount should be negative (debt)
+      
       finalAmount = -totalItemAmount;
     } else if (transactionStatus === 'Partial') {
-      // For partial transactions, record the remaining balance (negative)
+      
       finalAmount = amount - totalItemAmount;
     } else {
-      // For paid transactions, record the total item amount
+      
       finalAmount = totalItemAmount;
     }
 
@@ -269,10 +344,10 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       studentId: currentStudent.id,
       studentName: `${currentStudent.firstName} ${currentStudent.lastName}`,
       course: currentStudent.course,
-      amount: finalAmount, // Negative for credit (debt), positive for paid
-      transactionAmount: amount, // Keep the amount customer handed over
+      amount: finalAmount, 
+      transactionAmount: amount, 
       itemPrices: validItemPrices,
-      totalItemAmount: totalItemAmount, // Always positive - actual item value
+      totalItemAmount: totalItemAmount, 
       status: transactionStatus,
       timestamp: new Date(),
       cashier: 'Current User'
@@ -280,7 +355,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
     onAddTransaction(transaction);
 
-    // Show appropriate success message
+    
     if (transactionStatus === 'Credit') {
       toast.success(`Credit transaction processed: ₱${totalItemAmount.toFixed(2)} loan recorded`);
     } else if (transactionStatus === 'Partial') {
@@ -303,36 +378,91 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
   };
 
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Student ID Section */}
-      <Card>
-        <CardHeader className="p-4">
-          <CardTitle className="text-base">Student ID</CardTitle>
-          <CardDescription className="text-xs">Enter student ID to begin transaction</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 p-4 pt-0">
-          <div className="space-y-1.5">
-            <Label htmlFor="student-id" className="text-sm">Student ID</Label>
-            <div className="flex gap-2">
-              <Input
-                ref={inputRef}
-                id="student-id"
-                type="text"
-                placeholder="Enter student ID"
-                value={studentId}
-                onChange={handleStudentIdChange}
-                onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-                className="h-9"
-              />
-              <Button onClick={handleScan} disabled={!studentId.trim()} size="sm">
-                Find
-              </Button>
-            </div>
-          </div>
+  // Global key buffer listener for barcode scanner
+  // This bypasses React re-renders by collecting the full barcode before triggering any state updates
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
 
-          {/* Student Information Display */}
-          {currentStudent && (
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      
+      // Reset buffer if typing is slow (manual input)
+      // Barcode scanners send data very quickly (< 100ms between keys)
+      if (now - lastKeyTime > 100) {
+        buffer = '';
+      }
+
+      // Capture numeric characters (most barcodes are numeric)
+      // You can expand to /^[0-9a-zA-Z]$/ if you need alphanumeric
+      if (/^[0-9a-zA-Z]$/.test(e.key)) {
+        buffer += e.key;
+        console.log('Buffer:', buffer, '| Time gap:', now - lastKeyTime, 'ms');
+      }
+
+      // Scanners usually send Enter at the end
+      if (e.key === 'Enter' && buffer.length >= 3) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('✅ Full barcode scanned:', buffer, '| Length:', buffer.length);
+        
+        // Only NOW do we update React state - after the full barcode is captured
+        setStudentId(buffer);
+        handleScan(buffer); // directly trigger your existing scan logic
+        
+        buffer = '';
+      }
+
+      lastKeyTime = now;
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleScan]);
+
+  // Handle manual input changes (for typing in the input field)
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setStudentId(value);
+  }, []);
+
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-1">
+        {/* Student ID Section */}
+        <Card>
+          <CardContent className="space-y-3 p-4 pt-3">
+            {/* Manual ID Search */}
+            <div className="space-y-2">
+              <Label htmlFor="student-id" className="text-sm">Manual ID Search</Label>
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <Input
+                    ref={inputRef}
+                    id="student-id"
+                    type="text"
+                    placeholder="Scan barcode or enter Student ID"
+                    value={studentId}
+                    onChange={handleInputChange}
+                    onKeyDown={handleBarcodeInput}
+                    className="h-9 w-full border-2 border-green-500 focus:border-green-600"
+                    autoFocus
+                    autoComplete="off"
+                  />
+                  <Button onClick={() => handleScan()} disabled={!studentId.trim()} size="sm">
+                    Find
+                  </Button>
+                </div>
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  Scanner ready - Scan barcode now
+                </p>
+              </div>
+            </div>
+
+            {/* Student Information Display */}
+            {currentStudent && (
             <div className="space-y-3 pt-2">
               <Separator />
               <div className="space-y-2">
@@ -624,7 +754,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     title={studentLoyalty < 90 ? 'Requires 90+ loyalty points' : ''}
                   >
                     Partial
-                    {studentLoyalty < 90 && <span className="ml-1 text-xs">🔒</span>}
+                    {studentLoyalty < 90 && <span className="ml-1 text-xs"></span>}
                   </Button>
                   <Button
                     type="button"
@@ -636,7 +766,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     title={studentLoyalty < 100 ? 'Requires 100 loyalty points' : ''}
                   >
                     Credit
-                    {studentLoyalty < 100 && <span className="ml-1 text-xs">🔒</span>}
+                    {studentLoyalty < 100 && <span className="ml-1 text-xs"></span>}
                   </Button>
                 </div>
               </div>

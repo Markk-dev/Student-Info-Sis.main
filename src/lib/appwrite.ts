@@ -41,6 +41,7 @@ export interface Student {
   course: string;
   yearLevel: string;
   balance: number;
+  cash: number; // Cash balance for the student
   loyalty: number; // Loyalty points - starts at 50 for new students
   isActive: boolean;
   suspensionDate?: string; // ISO date string for suspension end date

@@ -49,6 +49,8 @@
   "course": "string",
   "yearLevel": "string",
   "balance": "number",
+  "cash": "number",
+  "loyalty": "number",
   "isActive": "boolean",
   "createdAt": "string",
   "updatedAt": "string"
