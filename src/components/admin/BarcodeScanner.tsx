@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserCheck, UserX, ShoppingCart, Search, Plus } from 'lucide-react';
+import { UserCheck, UserX, ShoppingCart, Search, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { studentService } from '@/lib/services';
 
@@ -18,6 +18,7 @@ interface Student {
   course: string;
   yearLevel: string;
   loyalty?: number;
+  token?: number; // Cash/token balance
   isRegistered: boolean;
 }
 
@@ -53,7 +54,16 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
   });
   const [courseSearch, setCourseSearch] = useState('');
   const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [addTokenMode, setAddTokenMode] = useState(false);
+  const [payWithToken, setPayWithToken] = useState(false);
+  const [isAddingToken, setIsAddingToken] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(5);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scannerProcessedRef = useRef(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isProcessingTokenRef = useRef(false);
 
   
   const filteredCourses = COURSES.filter(course =>
@@ -72,12 +82,30 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
   
   const studentLoyalty = currentStudent?.loyalty || 0;
-  const isPaidDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum < totalItemPrices;
-  const isPartialDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum >= totalItemPrices || transactionAmountNum === 0 || studentLoyalty < 90;
-  const isCreditDisabled = !currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum > 0 || studentLoyalty < 100;
+  
+  // In addTokenMode, only Paid is allowed and item prices are disabled
+  const isPaidDisabled = addTokenMode 
+    ? (!currentStudent?.isRegistered || transactionAmountNum <= 0)
+    : (!currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum < totalItemPrices);
+  const isPartialDisabled = addTokenMode 
+    ? true // Disabled in addTokenMode
+    : (!currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum >= totalItemPrices || transactionAmountNum === 0 || studentLoyalty < 90);
+  const isCreditDisabled = addTokenMode 
+    ? true // Disabled in addTokenMode
+    : (!currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum > 0 || studentLoyalty < 100);
 
   
   useEffect(() => {
+    // In addTokenMode, automatically set to Paid when amount is entered
+    if (addTokenMode) {
+      if (transactionAmountNum > 0) {
+        setTransactionStatus('Paid');
+      } else {
+        setTransactionStatus('');
+      }
+      return;
+    }
+
     if (!currentStudent?.isRegistered || totalItemPrices === 0) {
       setTransactionStatus('');
       return;
@@ -103,7 +131,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         setTransactionStatus('');
       }
     }
-  }, [transactionAmountNum, totalItemPrices, currentStudent?.isRegistered, currentStudent?.loyalty]);
+  }, [transactionAmountNum, totalItemPrices, currentStudent?.isRegistered, currentStudent?.loyalty, addTokenMode]);
 
   
   const addItemPrice = () => {
@@ -140,18 +168,26 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     };
   }, [isCourseDropdownOpen]);
 
-  const handleScan = useCallback(async (manualId?: string) => {
-    const id = (manualId || studentId).trim();
+  const handleScan = useCallback(async (searchId?: string) => {
+    const id = (searchId || studentId).trim();
     
-    if (!id) {
-      toast.error('Please enter a student ID');
+    if (!id || id.length < 6) {
+      // If search is too short (less than 6 digits), clear current student
+      setCurrentStudent(null);
+      setIsNewStudent(false);
       return;
     }
 
+    setIsSearching(true);
     try {
       // Get full student data including loyalty points
       const studentsResponse = await studentService.getStudents();
-      const fullStudent = studentsResponse.documents.find((s: any) => s.studentId === id);
+      // First try exact match, then try starts with match
+      const fullStudent = studentsResponse.documents.find((s: any) => 
+        s.studentId && s.studentId.toString() === id
+      ) || studentsResponse.documents.find((s: any) => 
+        s.studentId && s.studentId.toString().startsWith(id)
+      );
 
       if (fullStudent) {
         const student = {
@@ -161,41 +197,88 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
           course: fullStudent.course,
           yearLevel: fullStudent.yearLevel,
           loyalty: fullStudent.loyalty || 0,
+          token: fullStudent.token || fullStudent.cash || 0, // Support both token and cash field names
           isRegistered: true
         };
         setCurrentStudent(student);
         setIsNewStudent(false);
-        toast.success(`Student found: ${student.firstName} ${student.lastName}`);
-        // Clear input and refocus for next barcode scan
-        setTimeout(() => {
-          setStudentId('');
-          inputRef.current?.focus();
-        }, 300);
       } else {
-        // Student not registered yet
-        setCurrentStudent({
-          id: id,
-          firstName: '',
-          lastName: '',
-          course: '',
-          yearLevel: '',
-          loyalty: 0,
-          isRegistered: false
-        });
-        setIsNewStudent(true);
-        toast.warning('Student not registered. Please register them first.');
-        // Clear input and refocus
-        setTimeout(() => {
-          setStudentId('');
-          inputRef.current?.focus();
-        }, 500);
+        // Student not registered yet - check if we have a complete ID (6+ digits)
+        if (id.length >= 6) {
+          setCurrentStudent({
+            id: id,
+            firstName: '',
+            lastName: '',
+            course: '',
+            yearLevel: '',
+            loyalty: 0,
+            isRegistered: false
+          });
+          setIsNewStudent(true);
+        } else {
+          // Still typing, don't show as new student yet
+          setCurrentStudent(null);
+          setIsNewStudent(false);
+        }
       }
     } catch (error) {
-      toast.error('Error finding student.');
-      console.error(error);
+      console.error('Error finding student:', error);
+      setCurrentStudent(null);
+    } finally {
+      setIsSearching(false);
     }
   }, [studentId]);
 
+  // Dynamic search as user types (debounced)
+  useEffect(() => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If input is empty or too short (less than 6 digits), clear student
+    if (!studentId.trim() || studentId.trim().length < 6) {
+      setCurrentStudent(null);
+      setIsNewStudent(false);
+      return;
+    }
+
+    // Debounce the search - wait 300ms after user stops typing
+    // Only searches when 6+ digits are entered to limit database polling
+    searchTimeoutRef.current = setTimeout(() => {
+      handleScan(studentId);
+    }, 300);
+
+    // Cleanup
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [studentId, handleScan]);
+
+  // Cleanup countdown interval on unmount or when addTokenMode changes
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, []);
+
+  // Reset countdown when addTokenMode is disabled
+  useEffect(() => {
+    if (!addTokenMode && isAddingToken) {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      setIsAddingToken(false);
+      setCountdownSeconds(5);
+      isProcessingTokenRef.current = false; // Reset processing flag
+    }
+  }, [addTokenMode, isAddingToken]);
 
   
   useEffect(() => {
@@ -232,10 +315,15 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
   
   
-  // Handle Enter key in input field (for manual entry)
+  // Handle Enter key in input field (for manual entry only)
+  // Note: Barcode scanner Enter is handled by the global listener above
   const handleBarcodeInput = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault();
+      // Skip if scanner just processed this
+      if (scannerProcessedRef.current) {
+        return;
+      }
+      
       const scannedValue = studentId.trim();
       if (scannedValue) {
         console.log('Enter pressed manually - searching for:', scannedValue);
@@ -291,30 +379,107 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     }
   };
 
+  // Cancel add token operation
+  const cancelAddToken = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setIsAddingToken(false);
+    setCountdownSeconds(5);
+    isProcessingTokenRef.current = false; // Reset processing flag
+    toast.dismiss(); // Dismiss any existing toasts
+    toast.info('Operation canceled');
+  };
+
+  // Actually process the add token (called after countdown)
+  const processAddToken = async () => {
+    // Prevent duplicate processing
+    if (isProcessingTokenRef.current) {
+      return;
+    }
+
+    if (!currentStudent || !transactionAmount) {
+      return;
+    }
+
+    const amount = parseFloat(transactionAmount);
+    if (isNaN(amount) || amount <= 0) {
+      return;
+    }
+
+    // Set processing flag
+    isProcessingTokenRef.current = true;
+
+    const transaction = {
+      studentId: currentStudent.id,
+      studentName: `${currentStudent.firstName} ${currentStudent.lastName}`,
+      course: currentStudent.course,
+      amount: amount, // Positive amount for adding token/cash
+      transactionAmount: amount,
+      itemPrices: [],
+      totalItemAmount: amount, // Show the total amount processed
+      status: 'Bought Token', // Changed from 'Paid' to 'Bought Token'
+      tokenOperation: 'add', // Indicate this is adding token
+      cash: amount, // Database field name is "cash"
+      timestamp: new Date(),
+      cashier: 'Current User'
+    };
+
+    // Update student's cash balance in database
+    try {
+      const currentCash = currentStudent.token || 0;
+      const newCashBalance = currentCash + amount;
+      await studentService.updateStudent(currentStudent.id, {
+        cash: newCashBalance
+      });
+      
+      // Update local state to reflect the change
+      setCurrentStudent({
+        ...currentStudent,
+        token: newCashBalance
+      });
+    } catch (error) {
+      console.error('Error updating student cash balance:', error);
+      toast.dismiss(); // Dismiss any existing toasts
+      toast.error('Failed to update cash balance');
+      setIsAddingToken(false);
+      setCountdownSeconds(5);
+      isProcessingTokenRef.current = false; // Reset processing flag
+      return;
+    }
+
+    // Only show the token added toast, not the transaction processed toast
+    // We'll pass a flag to prevent the parent from showing duplicate toast
+    toast.dismiss(); // Dismiss any existing toasts
+    onAddTransaction({ ...transaction, skipTransactionToast: true });
+    toast.success(`Token added: ₱${amount.toFixed(2)} added to account`);
+
+    // Reset
+    setIsAddingToken(false);
+    setCountdownSeconds(5);
+    isProcessingTokenRef.current = false; // Reset processing flag
+    setStudentId('');
+    setCurrentStudent(null);
+    setTransactionAmount('');
+    setItemPrices(['']);
+    setTransactionStatus('');
+    setAddTokenMode(false);
+    setIsNewStudent(false);
+    setNewStudentData({ firstName: '', lastName: '', course: '', yearLevel: '' });
+    inputRef.current?.focus();
+  };
+
   const handleProcessTransaction = async () => {
     if (!currentStudent) {
       toast.error('Please enter a student ID');
       return;
     }
 
-    if (!transactionStatus) {
-      toast.error('Please select a transaction status');
-      return;
-    }
-
-    
-    const validItemPrices = itemPrices.filter(price => price.trim() !== '').map(price => parseFloat(price));
-    const totalItemAmount = validItemPrices.reduce((sum, price) => sum + price, 0);
-
-    if (totalItemAmount <= 0) {
-      toast.error('Please enter valid item prices');
-      return;
-    }
-
-    
-    if (transactionStatus !== 'Credit') {
+    // Handle Add Token Mode with countdown
+    if (addTokenMode) {
       if (!transactionAmount) {
-        toast.error('Please enter a transaction amount');
+        toast.error('Please enter an amount to add');
         return;
       }
 
@@ -323,20 +488,90 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         toast.error('Please enter a valid amount');
         return;
       }
+
+      // Start countdown
+      setIsAddingToken(true);
+      setCountdownSeconds(5);
+
+      countdownIntervalRef.current = setInterval(() => {
+        setCountdownSeconds((prev) => {
+          if (prev <= 1) {
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
+            // Countdown finished, process the add token
+            processAddToken();
+            return 5;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return;
+    }
+
+    // Normal transaction processing
+    if (!transactionStatus) {
+      toast.error('Please select a transaction status');
+      return;
+    }
+
+    const validItemPrices = itemPrices.filter(price => price.trim() !== '').map(price => parseFloat(price));
+    const totalItemAmount = validItemPrices.reduce((sum, price) => sum + price, 0);
+
+    if (totalItemAmount <= 0) {
+      toast.error('Please enter valid item prices');
+      return;
     }
 
     const amount = parseFloat(transactionAmount) || 0;
 
-    
+    // Handle Pay with Token
+    if (payWithToken) {
+      const currentToken = currentStudent.token || 0;
+      
+      // Check if token is sufficient
+      if (currentToken <= 0) {
+        // Check if loyalty points allow Partial/Credit
+        if (transactionStatus === 'Partial' && studentLoyalty >= 90) {
+          // Allow Partial with loyalty points
+        } else if (transactionStatus === 'Credit' && studentLoyalty >= 100) {
+          // Allow Credit with loyalty points
+        } else {
+          toast.dismiss(); // Dismiss any existing toasts
+          toast.error('Insufficient token');
+          return;
+        }
+      } else if (currentToken < totalItemAmount) {
+        // Token not enough - check if loyalty points allow Partial/Credit
+        if (transactionStatus === 'Partial' && studentLoyalty >= 90) {
+          // Allow Partial - use available token + loyalty
+          toast.dismiss(); // Dismiss any existing toasts
+          toast.warning(`Insufficient token. Using ₱${currentToken.toFixed(2)} token + loyalty points for partial payment`);
+        } else if (transactionStatus === 'Credit' && studentLoyalty >= 100) {
+          // Allow Credit - use available token + loyalty
+          toast.dismiss(); // Dismiss any existing toasts
+          toast.warning(`Insufficient token. Using ₱${currentToken.toFixed(2)} token + loyalty points for credit`);
+        } else {
+          toast.dismiss(); // Dismiss any existing toasts
+          toast.error('Insufficient token');
+          return;
+        }
+      } else {
+        // Token is sufficient
+        toast.dismiss(); // Dismiss any existing toasts
+        toast.success(`Using ₱${Math.min(currentToken, totalItemAmount).toFixed(2)} token for payment`);
+      }
+    }
+
+    // Calculate final amount
     let finalAmount: number;
     if (transactionStatus === 'Credit') {
-      
       finalAmount = -totalItemAmount;
     } else if (transactionStatus === 'Partial') {
-      
       finalAmount = amount - totalItemAmount;
     } else {
-      
       finalAmount = totalItemAmount;
     }
 
@@ -344,18 +579,44 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       studentId: currentStudent.id,
       studentName: `${currentStudent.firstName} ${currentStudent.lastName}`,
       course: currentStudent.course,
-      amount: finalAmount, 
-      transactionAmount: amount, 
+      amount: finalAmount,
+      transactionAmount: amount,
       itemPrices: validItemPrices,
-      totalItemAmount: totalItemAmount, 
-      status: transactionStatus,
+      totalItemAmount: totalItemAmount,
+      status: payWithToken && transactionStatus === 'Paid' ? 'Paid (Token)' : transactionStatus,
+      payWithToken: payWithToken,
+      tokenUsed: payWithToken ? Math.min(currentStudent.token || 0, totalItemAmount) : 0,
+      cash: payWithToken ? -Math.min(currentStudent.token || 0, totalItemAmount) : 0, // Database field name is "cash" (negative for deduction)
       timestamp: new Date(),
       cashier: 'Current User'
     };
 
+    // Update student's cash balance if paying with token
+    if (payWithToken) {
+      try {
+        const currentCash = currentStudent.token || 0;
+        const tokenToDeduct = Math.min(currentCash, totalItemAmount);
+        const newCashBalance = currentCash - tokenToDeduct;
+        await studentService.updateStudent(currentStudent.id, {
+          cash: newCashBalance
+        });
+        
+        // Update local state to reflect the change
+        setCurrentStudent({
+          ...currentStudent,
+          token: newCashBalance
+        });
+      } catch (error) {
+        console.error('Error updating student cash balance:', error);
+        toast.dismiss(); // Dismiss any existing toasts
+        toast.error('Failed to update cash balance');
+      }
+    }
+
+    toast.dismiss(); // Dismiss any existing toasts before showing new one
     onAddTransaction(transaction);
 
-    
+    // Success messages
     if (transactionStatus === 'Credit') {
       toast.success(`Credit transaction processed: ₱${totalItemAmount.toFixed(2)} loan recorded`);
     } else if (transactionStatus === 'Partial') {
@@ -365,14 +626,16 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       toast.success(`Transaction processed: ₱${totalItemAmount.toFixed(2)}`);
     }
 
+    // Reset
     setStudentId('');
     setCurrentStudent(null);
     setTransactionAmount('');
     setItemPrices(['']);
     setTransactionStatus('');
+    setPayWithToken(false);
+    setAddTokenMode(false);
     setIsNewStudent(false);
     setNewStudentData({ firstName: '', lastName: '', course: '', yearLevel: '' });
-
 
     inputRef.current?.focus();
   };
@@ -383,42 +646,110 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
   useEffect(() => {
     let buffer = '';
     let lastKeyTime = Date.now();
+    let firstKeyTime = Date.now(); // Track when buffer started
+    let keyTimes: number[] = []; // Track timing of all keys in sequence
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const now = Date.now();
+      const timeSinceLastKey = now - lastKeyTime;
       
-      // Reset buffer if typing is slow (manual input)
-      // Barcode scanners send data very quickly (< 100ms between keys)
-      if (now - lastKeyTime > 100) {
-        buffer = '';
+      // Capture alphanumeric characters
+      if (/^[0-9a-zA-Z]$/.test(e.key)) {
+        // If this is the first character, record the start time
+        if (buffer.length === 0) {
+          firstKeyTime = now;
+        }
+        
+        buffer += e.key;
+        // Only track timing if this isn't the first key (first key has no previous time)
+        if (buffer.length > 1) {
+          keyTimes.push(timeSinceLastKey);
+        }
+        
+        // If we're building a buffer and keys are coming fast, prevent input field from updating
+        // This helps ensure the buffer is used instead of the input field value
+        if (buffer.length > 0 && timeSinceLastKey < 100) {
+          // Don't prevent default here, but we'll handle it on Enter
+        }
+        
+        console.log('Buffer:', buffer, '| Time gap:', timeSinceLastKey, 'ms');
       }
 
-      // Capture numeric characters (most barcodes are numeric)
-      // You can expand to /^[0-9a-zA-Z]$/ if you need alphanumeric
-      if (/^[0-9a-zA-Z]$/.test(e.key)) {
-        buffer += e.key;
-        console.log('Buffer:', buffer, '| Time gap:', now - lastKeyTime, 'ms');
+      // Reset buffer if typing is slow (manual input) - but only if we have a buffer
+      // Only reset if there's a significant pause (more than 500ms) and it's not Enter
+      if (timeSinceLastKey > 500 && buffer.length > 0 && e.key !== 'Enter') {
+        console.log('Slow typing detected - resetting buffer');
+        buffer = '';
+        keyTimes = [];
+        firstKeyTime = Date.now();
       }
 
       // Scanners usually send Enter at the end
-      if (e.key === 'Enter' && buffer.length >= 3) {
-        e.preventDefault();
-        e.stopPropagation();
+      if (e.key === 'Enter') {
+        // Use buffer if available, otherwise fall back to input field value
+        const valueToSearch = buffer.length >= 6 ? buffer : (inputRef.current?.value?.trim() || '');
         
-        console.log('✅ Full barcode scanned:', buffer, '| Length:', buffer.length);
+        if (valueToSearch.length >= 6) {
+          // Check total time for the entire sequence (if we have a buffer)
+          const totalTime = buffer.length > 0 ? (now - firstKeyTime) : 0;
+          const timePerChar = buffer.length > 0 ? (totalTime / buffer.length) : 0;
+          
+          // Calculate average time between keys
+          const avgTime = keyTimes.length > 0 
+            ? keyTimes.reduce((sum, t) => sum + t, 0) / keyTimes.length 
+            : Infinity;
+          
+          // ULTRA AGGRESSIVE DETECTION: 
+          // Auto-search on ANY Enter press with a valid value UNLESS it's obviously very slow typing
+          // Most barcode scanners complete in < 1 second, so anything reasonable should auto-search
+          // Only exclude if it took more than 10 seconds (clearly manual typing with pauses)
+          const isVerySlowTyping = totalTime > 10000;
+          
+          // Auto-search for anything that's not obviously very slow
+          if (!isVerySlowTyping) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation(); // Stop all other handlers
+            
+            console.log('✅ Barcode scanned - Auto searching:', valueToSearch, '| Buffer length:', buffer.length, '| Total time:', totalTime, 'ms', '| Avg time:', avgTime.toFixed(2), 'ms', '| Time per char:', timePerChar.toFixed(2), 'ms');
+            
+            // Mark that we processed a scanner scan IMMEDIATELY
+            scannerProcessedRef.current = true;
+            
+            // Update state with the scanned value
+            setStudentId(valueToSearch);
+            
+            // Immediately search - use the value directly (bypasses debounce)
+            handleScan(valueToSearch);
+            
+            // Reset the flag after a delay
+            setTimeout(() => {
+              scannerProcessedRef.current = false;
+            }, 500);
+            
+            // Reset everything
+            buffer = '';
+            keyTimes = [];
+            firstKeyTime = Date.now();
+            lastKeyTime = Date.now();
+            return;
+          } else {
+            console.log('Very slow typing detected - not auto-searching. Total time:', totalTime, 'ms', '| Avg time:', avgTime.toFixed(2), 'ms');
+          }
+        }
         
-        // Only NOW do we update React state - after the full barcode is captured
-        setStudentId(buffer);
-        handleScan(buffer); // directly trigger your existing scan logic
-        
+        // If Enter is pressed but it's manual typing or no valid value, let the normal handler deal with it
+        // Reset buffer for next time
         buffer = '';
+        keyTimes = [];
+        firstKeyTime = Date.now();
       }
 
       lastKeyTime = now;
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true); // Use capture phase for better detection
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [handleScan]);
 
   // Handle manual input changes (for typing in the input field)
@@ -434,30 +765,48 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         <Card>
           <CardContent className="space-y-3 p-4 pt-3">
             {/* Manual ID Search */}
-            <div className="space-y-2">
-              <Label htmlFor="student-id" className="text-sm">Manual ID Search</Label>
-              <div className="flex flex-col gap-1">
-                <div className="flex gap-2">
-                  <Input
-                    ref={inputRef}
-                    id="student-id"
-                    type="text"
-                    placeholder="Scan barcode or enter Student ID"
-                    value={studentId}
-                    onChange={handleInputChange}
-                    onKeyDown={handleBarcodeInput}
-                    className="h-9 w-full border-2 border-green-500 focus:border-green-600"
-                    autoFocus
-                    autoComplete="off"
-                  />
-                  <Button onClick={() => handleScan()} disabled={!studentId.trim()} size="sm">
-                    Find
-                  </Button>
+            <div className=' flex flex-col gap-3 p-2'>
+              <div className="space-y-2">
+                <Label htmlFor="student-id" className="text-sm">Student ID Search</Label>
+                <div className="flex flex-col gap-1">
+                  <div className="flex gap-2">
+                    <Input
+                      ref={inputRef}
+                      id="student-id"
+                      type="text"
+                      placeholder="Type or scan Student ID (searches automatically)"
+                      value={studentId}
+                      onChange={handleInputChange}
+                      onKeyDown={handleBarcodeInput}
+                      className="h-9 w-full border-2 border-green-500 focus:border-green-600"
+                      autoFocus
+                      autoComplete="off"
+                    />
+                    <Button 
+                      onClick={() => {
+                        setStudentId('');
+                        setCurrentStudent(null);
+                        setIsNewStudent(false);
+                        inputRef.current?.focus();
+                      }} 
+                      disabled={!studentId.trim()} 
+                      size="sm"
+                      variant="outline"
+                      className="h-9 w-9 p-0"
+                      title="Clear field"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <span className={`w-2 h-2 rounded-full ${isSearching ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></span>
+                    {isSearching ? 'Searching...' : studentId.length >= 6 ? 'Searching as you type...' : studentId.length > 0 ? `Type ${6 - studentId.length} more digit${6 - studentId.length > 1 ? 's' : ''} to search` : 'Type or scan Student ID (6+ digits)'}
+                  </p>
                 </div>
-                <p className="text-xs text-green-600 flex items-center gap-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  Scanner ready - Scan barcode now
-                </p>
+              </div>
+
+              <div className='bg-blue-300'>
+
               </div>
             </div>
 
@@ -534,6 +883,58 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Token Management Section */}
+              {currentStudent.isRegistered && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Button
+                        onClick={() => {
+                          setAddTokenMode(!addTokenMode);
+                          if (!addTokenMode) {
+                            setPayWithToken(false);
+                            setItemPrices(['']);
+                            setTransactionAmount('');
+                            setTransactionStatus('');
+                          }
+                        }}
+                        variant={addTokenMode ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1 text-xs"
+                        disabled={!currentStudent.isRegistered || isAddingToken}
+                      >
+                        {addTokenMode ? 'Cancel Buy Token' : 'Buy Token'}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setPayWithToken(!payWithToken);
+                          if (!payWithToken) {
+                            setAddTokenMode(false);
+                          }
+                        }}
+                        variant={payWithToken ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1 text-xs"
+                        disabled={!currentStudent.isRegistered || addTokenMode}
+                      >
+                        {payWithToken ? 'Cancel Pay with Token' : 'Pay with Token'}
+                      </Button>
+                    </div>
+                    {addTokenMode && (
+                      <p className="text-xs text-blue-600">
+                        Enter the amount of token you wish to add
+                      </p>
+                    )}
+                    {payWithToken && (
+                      <p className="text-xs text-green-600">
+                        Pay with token: Token balance will be used for payment
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </CardContent>
@@ -669,34 +1070,54 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="amount" className="text-sm">Amount Paid (₱)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={transactionAmount}
-                  onChange={(e) => setTransactionAmount(e.target.value)}
-                  disabled={!currentStudent?.isRegistered}
-                  className="h-9"
-                />
-              </div>
+              {!addTokenMode && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="amount" className="text-sm">Amount Paid (₱)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={transactionAmount}
+                    onChange={(e) => setTransactionAmount(e.target.value)}
+                    disabled={!currentStudent?.isRegistered}
+                    className="h-9"
+                  />
+                </div>
+              )}
 
               <div className="space-y-1.5">
-                <Label className="text-sm">Item Prices (₱)</Label>
-                <div className="space-y-2">
-                  {itemPrices.map((price, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={price}
-                        onChange={(e) => updateItemPrice(index, e.target.value)}
-                        disabled={!currentStudent?.isRegistered}
-                        className={`flex-1 h-9 ${price && parseFloat(price) > 0 ? 'text-green-500' : ''}`}
-                      />
+                <Label className="text-sm">
+                  {addTokenMode ? 'Amount to Add (₱)' : 'Item Prices (₱)'}
+                </Label>
+                {addTokenMode ? (
+                  <div className="space-y-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={transactionAmount}
+                      onChange={(e) => setTransactionAmount(e.target.value)}
+                      disabled={!currentStudent?.isRegistered || isAddingToken}
+                      className="h-9"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the amount of token you wish to add
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {itemPrices.map((price, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={price}
+                          onChange={(e) => updateItemPrice(index, e.target.value)}
+                          disabled={!currentStudent?.isRegistered || addTokenMode}
+                          className={`flex-1 h-9 ${price && parseFloat(price) > 0 ? 'text-green-500' : ''}`}
+                        />
                       {index > 0 && (
                         <Button
                           type="button"
@@ -723,63 +1144,87 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                       )}
                     </div>
                   ))}
-                </div>
-                {totalItemPrices > 0 && (
-                  <div className="text-xs text-gray-600">
-                    Total Item Price: ₱{totalItemPrices.toFixed(2)}
+                    {totalItemPrices > 0 && (
+                      <div className="text-xs text-gray-600">
+                        Total Item Price: ₱{totalItemPrices.toFixed(2)}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-sm">Status</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    type="button"
-                    variant={transactionStatus === 'Paid' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransactionStatus('Paid')}
-                    disabled={isPaidDisabled}
-                    className={`text-xs ${transactionStatus === 'Paid' ? 'bg-green-500 hover:bg-green-600' : ''}`}
-                  >
-                    Paid
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={transactionStatus === 'Partial' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransactionStatus('Partial')}
-                    disabled={isPartialDisabled}
-                    className={`text-xs ${transactionStatus === 'Partial' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}`}
-                    title={studentLoyalty < 90 ? 'Requires 90+ loyalty points' : ''}
-                  >
-                    Partial
-                    {studentLoyalty < 90 && <span className="ml-1 text-xs"></span>}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={transactionStatus === 'Credit' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTransactionStatus('Credit')}
-                    disabled={isCreditDisabled}
-                    className={`text-xs ${transactionStatus === 'Credit' ? 'bg-red-500 hover:bg-red-600' : ''}`}
-                    title={studentLoyalty < 100 ? 'Requires 100 loyalty points' : ''}
-                  >
-                    Credit
-                    {studentLoyalty < 100 && <span className="ml-1 text-xs"></span>}
-                  </Button>
+              {!addTokenMode && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Status</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      type="button"
+                      variant={transactionStatus === 'Paid' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTransactionStatus('Paid')}
+                      disabled={isPaidDisabled}
+                      className={`text-xs ${transactionStatus === 'Paid' ? 'bg-green-500 hover:bg-green-600' : ''}`}
+                    >
+                      Paid
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={transactionStatus === 'Partial' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTransactionStatus('Partial')}
+                      disabled={isPartialDisabled}
+                      className={`text-xs ${transactionStatus === 'Partial' ? 'bg-yellow-500 hover:bg-yellow-600' : ''}`}
+                      title={studentLoyalty < 90 ? 'Requires 90+ loyalty points' : ''}
+                    >
+                      Partial
+                      {studentLoyalty < 90 && <span className="ml-1 text-xs"></span>}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={transactionStatus === 'Credit' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTransactionStatus('Credit')}
+                      disabled={isCreditDisabled}
+                      className={`text-xs ${transactionStatus === 'Credit' ? 'bg-red-500 hover:bg-red-600' : ''}`}
+                      title={studentLoyalty < 100 ? 'Requires 100 loyalty points' : ''}
+                    >
+                      Credit
+                      {studentLoyalty < 100 && <span className="ml-1 text-xs"></span>}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <Button
-                onClick={handleProcessTransaction}
-                disabled={!currentStudent?.isRegistered || !transactionStatus || totalItemPrices === 0 || (change < 0 && transactionStatus !== 'Credit' && transactionStatus !== 'Partial') || (transactionStatus !== 'Credit' && transactionStatus !== 'Partial' && !transactionAmount)}
-                className="w-full"
-                size="sm"
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Process Transaction
-              </Button>
+              <div className="relative w-full overflow-hidden rounded-md">
+                {isAddingToken && (
+                  <div 
+                    className="absolute inset-0 bg-red-500 rounded-md transition-all duration-1000 ease-linear" 
+                    style={{ 
+                      width: `${((5 - countdownSeconds) / 5) * 100}%`,
+                      right: 0,
+                      transition: 'width 1s linear'
+                    }} 
+                  />
+                )}
+                <Button
+                  onClick={isAddingToken ? cancelAddToken : handleProcessTransaction}
+                  disabled={
+                    !currentStudent?.isRegistered || 
+                    (addTokenMode 
+                      ? (isAddingToken ? false : transactionAmountNum <= 0)
+                      : (!transactionStatus || totalItemPrices === 0 || (change < 0 && transactionStatus !== 'Credit' && transactionStatus !== 'Partial') || (transactionStatus !== 'Credit' && transactionStatus !== 'Partial' && !transactionAmount)))
+                  }
+                  className={`w-full relative z-10 ${isAddingToken ? 'bg-red-500 hover:bg-red-600' : ''}`}
+                  size="sm"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  {isAddingToken 
+                    ? `Cancel (${countdownSeconds}s)` 
+                    : addTokenMode 
+                      ? 'Buy Token' 
+                      : 'Process Transaction'}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

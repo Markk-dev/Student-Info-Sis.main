@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -141,6 +142,12 @@ export function AdminDashboard() {
       });
 
       const getTransactionRevenue = (txn: any) => {
+        if (txn.status === 'Bought Token') {
+          return txn.totalItemAmount || txn.amount || 0;
+        }
+        if (txn.status === 'Paid (Token)' || txn.status === 'Paid') {
+          return txn.totalItemAmount || 0;
+        }
         if (txn.status === 'Partial') {
           return txn.transactionAmount || 0;
         }
@@ -155,7 +162,7 @@ export function AdminDashboard() {
       const totalTransactions = transformedTransactions.length;
       const totalRevenue = transformedTransactions
         .filter((txn: any) => txn.status !== 'Credit')
-        .reduce((sum: number, txn: any) => sum + (txn.totalItemAmount || 0), 0);
+        .reduce((sum: number, txn: any) => sum + getTransactionRevenue(txn), 0);
       const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
 
@@ -409,7 +416,10 @@ export function AdminDashboard() {
           id: txn.id,
           studentId: txn.studentId,
           name: txn.studentName,
-          amount: txn.amount,
+          amount: txn.status === 'Bought Token' 
+            ? Math.abs(txn.totalItemAmount || txn.amount || 0)
+            : Math.abs(txn.amount || 0),
+          status: txn.status || 'Paid',
           time: format(txn.timestamp, 'MMM dd, HH:mm'),
           course: txn.course.substring(0, 3).toUpperCase()
         }));
@@ -841,7 +851,27 @@ export function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-sm">₱{sale.amount.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">{sale.time}</p>
+                    <div className="flex items-center justify-end gap-1">
+                      {sale.status && (
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            sale.status === 'Bought Token' 
+                              ? 'bg-purple-100 text-purple-800 border-purple-200'
+                              : sale.status === 'Paid (Token)'
+                              ? 'bg-cyan-100 text-cyan-800 border-cyan-200'
+                              : sale.status === 'Partial'
+                              ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                              : sale.status === 'Credit'
+                              ? 'bg-blue-100 text-blue-800 border-blue-200'
+                              : 'bg-green-100 text-green-800 border-green-200'
+                          }`}
+                        >
+                          {sale.status}
+                        </Badge>
+                      )}
+                      <p className="text-xs text-muted-foreground">{sale.time}</p>
+                    </div>
                   </div>
                 </div>
               ))}

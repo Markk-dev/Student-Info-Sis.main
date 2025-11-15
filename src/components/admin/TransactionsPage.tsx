@@ -100,8 +100,13 @@ export function TransactionsPage() {
           };
         });
 
+        // Deduplicate by transaction ID (in case of any duplicates)
+        const uniqueTransactions = Array.from(
+          new Map(transformedTransactions.map(txn => [txn.id, txn])).values()
+        );
+
         // Sort by latest first (newest transactions at the top), then by ID as fallback
-        const sortedTransactions = transformedTransactions.sort((a, b) => {
+        const sortedTransactions = uniqueTransactions.sort((a, b) => {
           const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
           if (timeDiff !== 0) return timeDiff;
           // If timestamps are the same, sort by ID (newer IDs come first)
@@ -153,6 +158,8 @@ export function TransactionsPage() {
 
   const getStatusBadge = (status: Transaction['status']) => {
     const config = {
+      'Bought Token': { variant: 'default' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 rounded-full' },
+      'Paid (Token)': { variant: 'default' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-cyan-100 text-cyan-800 border border-cyan-200 rounded-full' },
       Paid: { variant: 'default' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 text-green-800 border border-green-200 rounded-full' },
       Partial: { variant: 'secondary' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-200 text-yellow-900 border border-yellow-300 rounded-full' },
       Credit: { variant: 'outline' as const, className: 'inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 rounded-full' },
@@ -233,7 +240,10 @@ export function TransactionsPage() {
 
       // Calculate amount based on transaction status
       let amount: number;
-      if (transactionData.status === 'Credit') {
+      if (transactionData.status === 'Bought Token') {
+        // For bought token transactions, use the amount directly (positive)
+        amount = transactionData.totalItemAmount || transactionData.amount || 0;
+      } else if (transactionData.status === 'Credit') {
         // For credit transactions, amount should be negative (debt)
         amount = -transactionData.totalItemAmount;
       } else if (transactionData.status === 'Partial') {
@@ -359,8 +369,13 @@ export function TransactionsPage() {
         };
       });
 
+      // Deduplicate by transaction ID (in case of any duplicates)
+      const uniqueTransactions = Array.from(
+        new Map(transformedTransactions.map(txn => [txn.id, txn])).values()
+      );
+
       // Sort by latest first (newest transactions at the top), then by ID as fallback
-      const sortedTransactions = transformedTransactions.sort((a, b) => {
+      const sortedTransactions = uniqueTransactions.sort((a, b) => {
         const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
         if (timeDiff !== 0) return timeDiff;
         // If timestamps are the same, sort by ID (newer IDs come first)
@@ -370,17 +385,31 @@ export function TransactionsPage() {
       setTransactions(sortedTransactions);
       setShowBarcodeScanner(false);
 
-      // Show appropriate success message with loyalty points info
-      if (transactionData.status === 'Credit') {
-        toast.success(`Credit transaction processed: ₱${transactionData.totalItemAmount.toFixed(2)} Credit recorded`);
-      } else {
-        let message = `Transaction processed: ₱${transactionData.totalItemAmount.toFixed(2)}`;
-        if (actualLoyaltyPointsEarned > 0) {
-          message += ` • +${actualLoyaltyPointsEarned} loyalty point${actualLoyaltyPointsEarned > 1 ? 's' : ''}`;
-        } else if (loyaltyPointsEarned > 0 && remainingDailyPoints === 0) {
-          message += ` • Daily loyalty limit reached (3 pts)`;
+      // Only show toast if not skipped (for add token operations, toast is shown in BarcodeScanner)
+      if (!transactionData.skipTransactionToast) {
+        toast.dismiss(); // Dismiss any existing toasts first - only show ONE toast
+        // Show appropriate success message with loyalty points info
+        if (transactionData.status === 'Bought Token') {
+          toast.success(`Token added: ₱${transactionData.totalItemAmount.toFixed(2)} added to account`);
+        } else if (transactionData.status === 'Credit') {
+          toast.success(`Credit transaction processed: ₱${transactionData.totalItemAmount.toFixed(2)} Credit recorded`);
+        } else if (transactionData.status === 'Paid (Token)') {
+          let message = `Transaction processed: ₱${transactionData.totalItemAmount.toFixed(2)} (Paid with Token)`;
+          if (actualLoyaltyPointsEarned > 0) {
+            message += ` • +${actualLoyaltyPointsEarned} loyalty point${actualLoyaltyPointsEarned > 1 ? 's' : ''}`;
+          } else if (loyaltyPointsEarned > 0 && remainingDailyPoints === 0) {
+            message += ` • Daily loyalty limit reached (3 pts)`;
+          }
+          toast.success(message);
+        } else {
+          let message = `Transaction processed: ₱${transactionData.totalItemAmount.toFixed(2)}`;
+          if (actualLoyaltyPointsEarned > 0) {
+            message += ` • +${actualLoyaltyPointsEarned} loyalty point${actualLoyaltyPointsEarned > 1 ? 's' : ''}`;
+          } else if (loyaltyPointsEarned > 0 && remainingDailyPoints === 0) {
+            message += ` • Daily loyalty limit reached (3 pts)`;
+          }
+          toast.success(message);
         }
-        toast.success(message);
       }
 
       // Dispatch event to notify dashboard of new transaction
@@ -728,8 +757,10 @@ export function TransactionsPage() {
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="Paid">Paid</SelectItem>
+                  <SelectItem value="Paid (Token)">Paid (Token)</SelectItem>
                   <SelectItem value="Partial">Partial</SelectItem>
                   <SelectItem value="Credit">Credit</SelectItem>
+                  <SelectItem value="Bought Token">Bought Token</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -777,7 +808,12 @@ export function TransactionsPage() {
                             ? 'text-yellow-600'
                             : ''
                       }>
-                        ₱{transaction.amount.toFixed(2)}
+                        ₱{(transaction.status === 'Bought Token' 
+                          ? Math.abs(transaction.totalItemAmount || transaction.amount || 0)
+                          : transaction.status === 'Paid (Token)' || transaction.status === 'Paid'
+                          ? Math.abs(transaction.totalItemAmount || transaction.amount || 0)
+                          : Math.abs(transaction.amount || 0)
+                        ).toFixed(2)}
                       </span>
                     </TableCell>
                     <TableCell className="px-4">{getStatusBadge(transaction.status)}</TableCell>
