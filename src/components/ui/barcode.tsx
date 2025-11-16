@@ -3,6 +3,8 @@ import JsBarcode from 'jsbarcode';
 import { Download, Printer } from 'lucide-react';
 import { Button } from './button';
 
+// Barcode component for generating and displaying barcodes
+
 interface BarcodeProps {
   value: string;
   width?: number;
@@ -11,7 +13,7 @@ interface BarcodeProps {
   format?: string;
   className?: string;
   showActions?: boolean;
-  plain?: boolean; // If true, removes white background wrapper
+  plain?: boolean;
 }
 
 export function Barcode({
