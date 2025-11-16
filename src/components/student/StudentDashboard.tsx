@@ -424,8 +424,8 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${studentInfo.loyalty >= 100 ? 'text-yellow-300' :
-                studentInfo.loyalty >= 90 ? 'text-blue-200' :
-                  studentInfo.loyalty >= 50 ? 'text-white' : 'text-red-200'
+              studentInfo.loyalty >= 90 ? 'text-blue-200' :
+                studentInfo.loyalty >= 50 ? 'text-white' : 'text-red-200'
               }`}>
               {studentInfo.loyalty}/100
             </div>
@@ -519,18 +519,18 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
                 <div className="flex items-center justify-between sm:block sm:text-right">
                   <div className="flex flex-col sm:block">
                     <p className={`font-semibold text-sm sm:text-base ${transaction.status === 'Credit'
-                        ? 'text-red-600'
-                        : transaction.status === 'Partial'
-                          ? 'text-yellow-600'
-                          : ''
+                      ? 'text-red-600'
+                      : transaction.status === 'Partial'
+                        ? 'text-yellow-600'
+                        : ''
                       }`}>
                       ₱{transaction.amount.toFixed(2)}
                     </p>
-                    <Badge variant="outline" className={`text-[9px] sm:text-xs px-1 sm:px-2 py-0.5 sm:py-1 w-fit max-w-[70px] sm:max-w-none truncate leading-tight ${transaction.status === 'Partial'
-                        ? 'bg-yellow-200 text-yellow-900 border-yellow-300'
-                        : ''
+                    <Badge variant="outline" className={`text-[7px] sm:text-xs px-0.5 sm:px-2 py-0 sm:py-1 w-fit max-w-[45px] sm:max-w-none truncate leading-none h-3 sm:h-auto flex items-center justify-center ${transaction.status === 'Partial'
+                      ? 'bg-yellow-200 text-yellow-900 border-yellow-300'
+                      : ''
                       }`}>
-                      <span className="block truncate">{transaction.status}</span>
+                      <span className="truncate">{transaction.status}</span>
                     </Badge>
                   </div>
                 </div>
