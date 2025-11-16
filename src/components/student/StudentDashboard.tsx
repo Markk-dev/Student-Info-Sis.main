@@ -530,7 +530,14 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
                       ? 'bg-yellow-200 text-yellow-900 border-yellow-300'
                       : ''
                       }`}>
-                      <span className="truncate">{transaction.status}</span>
+                      <span className="truncate">
+                        <span className="sm:hidden">
+                          {transaction.status === 'Bought Token' ? 'Token' : 
+                           transaction.status === 'Paid (Token)' ? 'Paid' : 
+                           transaction.status}
+                        </span>
+                        <span className="hidden sm:inline">{transaction.status}</span>
+                      </span>
                     </Badge>
                   </div>
                 </div>
