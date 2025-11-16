@@ -49,7 +49,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   const [upcomingDuePayments, setUpcomingDuePayments] = useState<any[]>([]);
   const itemsPerPage = 5;
 
-  
+
   useEffect(() => {
     const checkMaintenance = async () => {
       try {
@@ -60,16 +60,16 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         console.error('Error checking maintenance status:', error);
       }
     };
-    
+
     checkMaintenance();
   }, []);
 
-  
+
   useEffect(() => {
     const loadStudentData = async () => {
       try {
         setLoading(true);
-        
+
         // Load transactions
         const response = await transactionService.getTransactions();
         const studentTransactions = response.documents
@@ -81,12 +81,12 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
               const dateString = txn.$createdAt || txn.createdAt;
               timestamp = new Date(dateString);
               if (isNaN(timestamp.getTime())) {
-                timestamp = new Date(); 
+                timestamp = new Date();
               }
             } catch (error) {
-              timestamp = new Date(); 
+              timestamp = new Date();
             }
-            
+
             return {
               id: txn.$id,
               amount: txn.amount,
@@ -97,7 +97,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
             };
           })
           .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Sort by timestamp descending (newest first)
-        
+
         console.log('Raw transactions before sorting:', response.documents
           .filter((txn: any) => txn.studentId === studentData.studentId)
           .map(txn => ({
@@ -106,15 +106,15 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
             createdAt: txn.createdAt,
             amount: txn.amount
           }))); // Debug log
-        
+
         console.log('Sorted transactions:', studentTransactions.map(t => ({
           id: t.id,
           timestamp: t.timestamp,
           amount: t.amount
         }))); // Debug log
-        
+
         setTransactions(studentTransactions);
-        
+
         // Load student info from database
         try {
           const studentInfo = await studentService.getStudent(studentData.id);
@@ -134,7 +134,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
             canMakeTransactions: true
           });
         }
-        
+
         // Load upcoming due payments
         try {
           const duePayments = await getUpcomingDuePayments(studentData.studentId);
@@ -143,7 +143,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           console.error('Error loading upcoming due payments:', error);
           setUpcomingDuePayments([]);
         }
-        
+
       } catch (error) {
         console.error('Error loading student data:', error);
       } finally {
@@ -175,25 +175,25 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   }, [studentData.studentId]);
 
 
-  
+
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
 
 
-  
+
   const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
   const totalTransactions = transactions.length;
   const averageTransaction = totalTransactions > 0 ? totalSpent / totalTransactions : 0;
@@ -204,7 +204,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   const endIndex = startIndex + itemsPerPage;
   const paginatedTransactions = transactions.slice(startIndex, endIndex);
 
-  
+
   // const filteredTransactions = useMemo(() => {
   //   const now = new Date();
   //   let startDate: Date;
@@ -232,7 +232,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   //   }
 
   //   return transactions.filter(t => {
-      
+
   //     if (!t.timestamp || isNaN(t.timestamp.getTime())) {
   //       return false; 
   //     }
@@ -240,12 +240,12 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
   //   });
   // }, [transactions, selectedPeriod]);
 
-  
+
   const chartData = useMemo(() => {
     const monthlyData = new Map<string, number>();
-    
+
     transactions.forEach(t => {
-      
+
       if (t.timestamp && !isNaN(t.timestamp.getTime())) {
         const monthKey = format(t.timestamp, 'MMM yyyy');
         monthlyData.set(monthKey, (monthlyData.get(monthKey) || 0) + t.amount);
@@ -260,7 +260,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
 
   const categoryData = useMemo(() => {
     const categories = new Map<string, number>();
-    
+
     transactions.forEach(t => {
       const category = t.status || 'Other';
       // Use absolute value for display purposes to ensure positive values in the chart
@@ -312,7 +312,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
             const countdown = getDueDateCountdown(payment.dueDate);
             const dueDate = new Date(payment.dueDate);
             const totalAmount = Math.abs(payment.totalItemAmount || payment.amount);
-            
+
             return (
               <div key={payment.$id || index} className={`p-1.5 sm:p-2 ${alarm.bgColor} border ${alarm.borderColor} rounded shadow-sm`}>
                 <div className="flex items-center gap-1.5">
@@ -368,7 +368,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">₱{studentInfo.cash.toFixed(2)}</div>
-            <DottedSeparator className='my-1 sm:my-2'/>
+            <DottedSeparator className='my-1 sm:my-2' />
             <p className="text-xs text-muted-foreground text-white">
               Available token
             </p>
@@ -378,11 +378,11 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         <Card className='bg-green-500'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-white">Total Spent</CardTitle>
-            <PhilippinePeso className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white"/>
+            <PhilippinePeso className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white" />
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">₱{totalSpent.toFixed(2)}</div>
-            <DottedSeparator className='my-1 sm:my-2'/>
+            <DottedSeparator className='my-1 sm:my-2' />
             <p className="text-xs text-muted-foreground text-white">
               All time spending
             </p>
@@ -392,11 +392,11 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         <Card className='bg-green-500 hidden sm:block'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-white">Total Transactions</CardTitle>
-            <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white"/>
+            <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white" />
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{totalTransactions}</div>
-            <DottedSeparator className='my-1 sm:my-2'/>
+            <DottedSeparator className='my-1 sm:my-2' />
             <p className="text-xs text-muted-foreground text-white">
               Number of purchases
             </p>
@@ -410,7 +410,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">₱{averageTransaction.toFixed(2)}</div>
-            <DottedSeparator className='my-1 sm:my-2'/>
+            <DottedSeparator className='my-1 sm:my-2' />
             <p className="text-xs text-muted-foreground text-white">
               Per transaction
             </p>
@@ -423,14 +423,13 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
             <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white" />
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
-            <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${
-              studentInfo.loyalty >= 100 ? 'text-yellow-300' :
-              studentInfo.loyalty >= 90 ? 'text-blue-200' :
-              studentInfo.loyalty >= 50 ? 'text-white' : 'text-red-200'
-            }`}>
+            <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${studentInfo.loyalty >= 100 ? 'text-yellow-300' :
+                studentInfo.loyalty >= 90 ? 'text-blue-200' :
+                  studentInfo.loyalty >= 50 ? 'text-white' : 'text-red-200'
+              }`}>
               {studentInfo.loyalty}/100
             </div>
-            <DottedSeparator className='my-1 sm:my-2'/>
+            <DottedSeparator className='my-1 sm:my-2' />
             <p className="text-xs text-muted-foreground text-white">
               Current balance
             </p>
@@ -519,27 +518,25 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
                 </div>
                 <div className="flex items-center justify-between sm:block sm:text-right">
                   <div className="flex flex-col sm:block">
-                    <p className={`font-semibold text-sm sm:text-base ${
-                      transaction.status === 'Credit' 
-                        ? 'text-red-600' 
-                        : transaction.status === 'Partial' 
-                          ? 'text-yellow-600' 
+                    <p className={`font-semibold text-sm sm:text-base ${transaction.status === 'Credit'
+                        ? 'text-red-600'
+                        : transaction.status === 'Partial'
+                          ? 'text-yellow-600'
                           : ''
-                    }`}>
+                      }`}>
                       ₱{transaction.amount.toFixed(2)}
                     </p>
-                    <Badge variant="outline" className={`text-xs w-fit ${
-                      transaction.status === 'Partial' 
-                        ? 'bg-yellow-200 text-yellow-900 border-yellow-300' 
+                    <Badge variant="outline" className={`text-xs w-fit ${transaction.status === 'Partial'
+                        ? 'bg-yellow-200 text-yellow-900 border-yellow-300'
                         : ''
-                    }`}>
+                      }`}>
                       {transaction.status}
                     </Badge>
                   </div>
                 </div>
               </div>
             ))}
-            
+
             {transactions.length === 0 && (
               <div className="text-center py-8">
                 <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
