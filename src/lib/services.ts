@@ -237,7 +237,7 @@ export const studentService = {
         firstName: firstName,
         lastName: lastName,
         email: providedEmail && providedEmail.length > 0 ? providedEmail : `${data.id}@quickregister.local`,
-        password: 'default123', 
+        password: data.id, // Use student ID as default password
         course: data.course,
         yearLevel: data.yearLevel,
         balance: 0,

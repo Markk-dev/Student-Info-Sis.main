@@ -14,17 +14,17 @@ import { format as formatDateFns } from 'date-fns';
 import { BarcodeScanner } from './BarcodeScanner';
 import { DottedSeparator } from '../ui/dotted-line';
 
-// const COLORS = ['#14a800', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6'];
+
 
 interface Transaction {
   id: string;
   studentId: string;
   studentName: string;
   course: string;
-  amount: number; // This will now be the item prices total
-  transactionAmount?: number; // Amount customer handed over
-  itemPrices?: string; // Individual item prices stored as JSON string
-  totalItemAmount?: number; // Total of item prices
+  amount: number; 
+  transactionAmount?: number; 
+  itemPrices?: string; 
+  totalItemAmount?: number; 
   timestamp: Date;
   cashier: string;
   status: 'Paid' | 'Partial' | 'Credit' | 'completed' | 'pending' | 'refunded' | 'Bought Token' | 'Paid (Token)';
@@ -36,7 +36,7 @@ export function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  // Removed date filter per request
+  
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -67,13 +67,13 @@ export function TransactionsPage() {
 
           let timestamp: Date;
           try {
-            // Appwrite stores timestamps in ISO format, parse directly
+            
             timestamp = new Date(txn.$createdAt || txn.createdAt);
             if (isNaN(timestamp.getTime())) {
               console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
               timestamp = new Date();
             } else {
-              // Debug log for successful timestamp parsing
+              
               console.log(`Successfully parsed timestamp for ${txn.$id}:`, {
                 raw: txn.$createdAt || txn.createdAt,
                 parsed: timestamp.toISOString(),
@@ -100,16 +100,16 @@ export function TransactionsPage() {
           };
         });
 
-        // Deduplicate by transaction ID (in case of any duplicates)
+        
         const uniqueTransactions = Array.from(
           new Map(transformedTransactions.map(txn => [txn.id, txn])).values()
         );
 
-        // Sort by latest first (newest transactions at the top), then by ID as fallback
+        
         const sortedTransactions = uniqueTransactions.sort((a, b) => {
           const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
           if (timeDiff !== 0) return timeDiff;
-          // If timestamps are the same, sort by ID (newer IDs come first)
+          
           return b.id.localeCompare(a.id);
         });
 
@@ -145,13 +145,13 @@ export function TransactionsPage() {
     });
   }, [transactions, searchTerm, courseFilter, statusFilter]);
 
-  // Pagination logic
+  
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
 
-  // Reset to first page when filters change
+  
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, courseFilter, statusFilter]);
@@ -181,7 +181,7 @@ export function TransactionsPage() {
     if (!date || isNaN(date.getTime())) {
       return 'Invalid Date';
     }
-    // Use the date directly - formatDateFns handles timezone conversion
+    
     return formatDateFns(date, 'MMM dd, yyyy');
   };
 
@@ -189,21 +189,10 @@ export function TransactionsPage() {
     if (!date || isNaN(date.getTime())) {
       return 'Invalid Time';
     }
-    // Use the date directly - formatDateFns handles timezone conversion
-    return formatDateFns(date, 'HH:mm');
+    
+    return formatDateFns(date, 'h:mm a');
   };
 
-  // Debug function to log timestamp information (uncomment for debugging)
-  // const debugTimestamp = (date: Date, transactionId: string) => {
-  //   console.log(`Transaction ${transactionId}:`, {
-  //     originalDate: date,
-  //     isoString: date.toISOString(),
-  //     localString: date.toString(),
-  //     timezoneOffset: date.getTimezoneOffset(),
-  //     formattedDate: formatDate(date),
-  //     formattedTime: formatTime(date)
-  //   });
-  // };
 
   const exportCSV = () => {
 
@@ -216,7 +205,7 @@ export function TransactionsPage() {
         `"${t.studentName}"`,
         `"${t.course}"`,
         t.amount.toFixed(2),
-        // Combine date and time without year and quote to avoid comma issues
+        
         `"${formatDateFns(t.timestamp, 'MMM d')}_${formatDateFns(t.timestamp, 'HH:mm')}"`,
         `"${t.cashier}"`,
         t.status
@@ -238,23 +227,23 @@ export function TransactionsPage() {
   const handleNewTransaction = async (transactionData: any) => {
     try {
 
-      // Calculate amount based on transaction status
+      
       let amount: number;
       if (transactionData.status === 'Bought Token') {
-        // For bought token transactions, use the amount directly (positive)
+        
         amount = transactionData.totalItemAmount || transactionData.amount || 0;
       } else if (transactionData.status === 'Credit') {
-        // For credit transactions, amount should be negative (debt)
+        
         amount = -transactionData.totalItemAmount;
       } else if (transactionData.status === 'Partial') {
-        // For partial transactions, record the remaining balance (negative)
+        
         amount = transactionData.transactionAmount - transactionData.totalItemAmount;
       } else {
-        // For paid transactions, record the total item amount
+        
         amount = transactionData.totalItemAmount;
       }
 
-      // Calculate loyalty points based on totalItemAmount
+      
       const calculateLoyaltyPoints = (totalAmount: number): number => {
         if (totalAmount >= 100) return 3;
         if (totalAmount >= 60) return 2;
@@ -262,7 +251,7 @@ export function TransactionsPage() {
         return 0;
       };
 
-      // Only award loyalty points for fully paid transactions
+      
       let actualLoyaltyPointsEarned = 0;
       let loyaltyPointsEarned = 0;
       let remainingDailyPoints = 0;
@@ -270,7 +259,7 @@ export function TransactionsPage() {
       if (transactionData.status === 'Paid') {
         loyaltyPointsEarned = calculateLoyaltyPoints(transactionData.totalItemAmount);
 
-        // Get current student data to check daily loyalty points
+        
         const currentStudentsResponse = await studentService.getStudents();
         const student = currentStudentsResponse.documents.find((s: any) => s.studentId === transactionData.studentId);
 
@@ -278,7 +267,7 @@ export function TransactionsPage() {
           throw new Error('Student not found');
         }
 
-        // Check today's transactions to calculate daily loyalty points earned
+        
         const today = new Date();
         const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
@@ -289,37 +278,37 @@ export function TransactionsPage() {
           return txnDate >= todayStart && txnDate < todayEnd && txn.studentId === transactionData.studentId && txn.status === 'Paid';
         });
 
-        // Calculate total loyalty points earned today (before this transaction) - only from paid transactions
+        
         let dailyLoyaltyEarned = 0;
         todayTransactions.forEach((txn: any) => {
           const txnAmount = txn.totalItemAmount || 0;
           dailyLoyaltyEarned += calculateLoyaltyPoints(txnAmount);
         });
 
-        // Apply daily cap of 3 points
+        
         const DAILY_LOYALTY_CAP = 3;
         remainingDailyPoints = Math.max(0, DAILY_LOYALTY_CAP - dailyLoyaltyEarned);
         actualLoyaltyPointsEarned = Math.min(loyaltyPointsEarned, remainingDailyPoints);
       }
 
-      // Create the transaction with due date calculation
+      
       await transactionService.createTransactionWithDueDate({
         studentId: transactionData.studentId,
-        amount: amount, // Calculated based on status
-        transactionAmount: transactionData.transactionAmount, // Amount customer handed over
-        totalItemAmount: transactionData.totalItemAmount, // Always positive - actual item value
-        itemPrices: JSON.stringify(transactionData.itemPrices || []), // Store as JSON string
-        status: transactionData.status, // Paid/Partial/Credit
+        amount: amount, 
+        transactionAmount: transactionData.transactionAmount, 
+        totalItemAmount: transactionData.totalItemAmount, 
+        itemPrices: JSON.stringify(transactionData.itemPrices || []), 
+        status: transactionData.status, 
         cashierId: 'admin_002',
       });
 
-      // Update student's loyalty points if any were earned (only for paid transactions)
+      
       if (transactionData.status === 'Paid' && actualLoyaltyPointsEarned > 0) {
         const currentStudentsResponse2 = await studentService.getStudents();
         const student = currentStudentsResponse2.documents.find((s: any) => s.studentId === transactionData.studentId);
 
         if (student) {
-          const newLoyaltyPoints = Math.min(100, (student.loyalty || 0) + actualLoyaltyPointsEarned); // Cap at 100
+          const newLoyaltyPoints = Math.min(100, (student.loyalty || 0) + actualLoyaltyPointsEarned); 
           await studentService.updateStudent(transactionData.studentId, {
             loyalty: newLoyaltyPoints
           });
@@ -343,7 +332,7 @@ export function TransactionsPage() {
 
         let timestamp: Date;
         try {
-          // Appwrite stores timestamps in ISO format, parse directly
+          
           timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
             console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
@@ -369,26 +358,26 @@ export function TransactionsPage() {
         };
       });
 
-      // Deduplicate by transaction ID (in case of any duplicates)
+      
       const uniqueTransactions = Array.from(
         new Map(transformedTransactions.map(txn => [txn.id, txn])).values()
       );
 
-      // Sort by latest first (newest transactions at the top), then by ID as fallback
+      
       const sortedTransactions = uniqueTransactions.sort((a, b) => {
         const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
         if (timeDiff !== 0) return timeDiff;
-        // If timestamps are the same, sort by ID (newer IDs come first)
+        
         return b.id.localeCompare(a.id);
       });
 
       setTransactions(sortedTransactions);
       setShowBarcodeScanner(false);
 
-      // Only show toast if not skipped (for add token operations, toast is shown in BarcodeScanner)
+      
       if (!transactionData.skipTransactionToast) {
-        toast.dismiss(); // Dismiss any existing toasts first - only show ONE toast
-        // Show appropriate success message with loyalty points info
+        toast.dismiss(); 
+        
         if (transactionData.status === 'Bought Token') {
           toast.success(`Token added: ₱${transactionData.totalItemAmount.toFixed(2)} added to account`);
         } else if (transactionData.status === 'Credit') {
@@ -412,7 +401,7 @@ export function TransactionsPage() {
         }
       }
 
-      // Dispatch event to notify dashboard of new transaction
+      
       console.log('Dispatching transactionCreated event');
       window.dispatchEvent(new CustomEvent('transactionCreated'));
     } catch (error) {
@@ -436,10 +425,10 @@ export function TransactionsPage() {
 
       const currentTransactionAmount = editingTransaction.transactionAmount || 0;
       const totalItemAmount = editingTransaction.totalItemAmount || 0;
-      const currentAmount = editingTransaction.amount; // This is the remaining balance (negative for partial/credit)
+      const currentAmount = editingTransaction.amount; 
       const remainingBalance = Math.abs(currentAmount);
 
-      // Prevent overpayment
+      
       if (payment > remainingBalance) {
         toast.error(`Payment amount cannot exceed outstanding balance of ₱${remainingBalance.toFixed(2)}`);
         return;
@@ -450,33 +439,33 @@ export function TransactionsPage() {
       let newStatus: 'Paid' | 'Partial' | 'Credit';
 
       if (paymentType === 'full') {
-        // Pay the full remaining balance
+        
         newTransactionAmount = currentTransactionAmount + remainingBalance;
-        newAmount = totalItemAmount; // Now equals totalItemAmount since fully paid
+        newAmount = totalItemAmount; 
         newStatus = 'Paid';
       } else {
-        // Partial payment
+        
         if (payment >= remainingBalance) {
-          // Payment covers full balance
+          
           newTransactionAmount = currentTransactionAmount + remainingBalance;
-          newAmount = totalItemAmount; // Now equals totalItemAmount since fully paid
+          newAmount = totalItemAmount; 
           newStatus = 'Paid';
         } else {
-          // Partial payment - still has remaining balance
+          
           newTransactionAmount = currentTransactionAmount + payment;
-          newAmount = -(remainingBalance - payment); // Negative amount for remaining balance
+          newAmount = -(remainingBalance - payment); 
           newStatus = 'Partial';
         }
       }
 
-      // Update the transaction
+      
       await transactionService.updateTransaction(editingTransaction.id, {
         transactionAmount: newTransactionAmount,
         amount: newAmount,
         status: newStatus
       });
 
-      // Refresh data
+      
       const transactionsResponse = await transactionService.getTransactions();
       const studentsResponse = await studentService.getStudents();
 
@@ -517,7 +506,7 @@ export function TransactionsPage() {
 
       console.log('Refreshed transaction data:', transformedTransactions.find(t => t.id === editingTransaction.id));
 
-      // Ensure newest transactions appear first
+      
       const sortedTransactions = transformedTransactions.sort((a, b) => {
         const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
         if (timeDiff !== 0) return timeDiff;
@@ -533,7 +522,7 @@ export function TransactionsPage() {
         toast.success(`Partial payment of ₱${payment.toFixed(2)} processed. Remaining balance: ₱${Math.abs(newAmount).toFixed(2)}`);
       }
 
-      // Dispatch event to notify students page of transaction update
+      
       window.dispatchEvent(new CustomEvent('transactionUpdated'));
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -567,7 +556,7 @@ export function TransactionsPage() {
 
         let timestamp: Date;
         try {
-          // Appwrite stores timestamps in ISO format, parse directly
+          
           timestamp = new Date(txn.$createdAt || txn.createdAt);
           if (isNaN(timestamp.getTime())) {
             console.warn('Invalid timestamp for transaction:', txn.$id, txn.$createdAt);
@@ -590,7 +579,7 @@ export function TransactionsPage() {
         };
       });
 
-      // Ensure newest transactions appear first
+      
       const sortedTransactions = transformedTransactions.sort((a, b) => {
         const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
         if (timeDiff !== 0) return timeDiff;

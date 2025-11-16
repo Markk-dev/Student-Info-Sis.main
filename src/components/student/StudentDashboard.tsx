@@ -3,12 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, PhilippinePeso, ShoppingCart, CreditCard, CheckCircle, Wallet } from 'lucide-react';
+import { TrendingUp, PhilippinePeso, ShoppingCart, CreditCard, Wallet } from 'lucide-react';
 import { transactionService, studentService } from '@/lib/services';
 import { getUpcomingDuePayments, getDueDateCountdown, getPaymentAlarmLevel } from '@/lib/paymentTracking';
 import { format } from 'date-fns';
 import { DottedSeparator } from '../ui/dotted-line';
-import { Barcode } from '@/components/ui/barcode';
 
 interface Transaction {
   id: string;
@@ -350,46 +349,28 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
         </div>
       )}
 
-      {/* Welcome Header Card */}
-      <Card className="bg-gradient-to-br from-green-50 via-white to-green-50/50 border border-green-200/50 shadow-sm overflow-hidden">
-        <CardContent className="p-6 sm:p-8">
-          <div className="flex items-center justify-between gap-6">
-            <div className="flex flex-col gap-3 flex-1">
-              <div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1">
-                  Welcome back, {studentData.name.split(' ')[0]}!
-                </h1>
-                <p className="text-sm sm:text-base text-gray-500 font-medium">
-                  Student ID: <span className="text-green-600 font-semibold">{studentData.studentId}</span>
-                </p>
-              </div>
-            </div>
-            <div className="flex-shrink-0 flex items-center">
-              <Barcode 
-                value={studentData.studentId} 
-                width={1.2} 
-                height={45} 
-                showActions={false}
-                plain={true}
-                className="opacity-90"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Welcome Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+          Welcome back, {studentData.name.split(' ')[0]}!
+        </h1>
+        <p className="text-sm text-gray-500">
+          Student ID: <span className="text-green-600 font-semibold">{studentData.studentId}</span>
+        </p>
+      </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         <Card className='bg-green-500'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-white">Cash Balance</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium text-white">Token Balance</CardTitle>
             <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white" />
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">₱{studentInfo.cash.toFixed(2)}</div>
             <DottedSeparator className='my-1 sm:my-2'/>
             <p className="text-xs text-muted-foreground text-white">
-              Available cash
+              Available token
             </p>
           </CardContent>
         </Card>
@@ -415,6 +396,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{totalTransactions}</div>
+            <DottedSeparator className='my-1 sm:my-2'/>
             <p className="text-xs text-muted-foreground text-white">
               Number of purchases
             </p>
@@ -428,6 +410,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">₱{averageTransaction.toFixed(2)}</div>
+            <DottedSeparator className='my-1 sm:my-2'/>
             <p className="text-xs text-muted-foreground text-white">
               Per transaction
             </p>
@@ -447,28 +430,9 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
             }`}>
               {studentInfo.loyalty}/100
             </div>
+            <DottedSeparator className='my-1 sm:my-2'/>
             <p className="text-xs text-muted-foreground text-white">
               Current balance
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className='bg-green-500'>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
-            <CardTitle className="text-xs sm:text-sm font-medium text-white">Account Status</CardTitle>
-            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white" />
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
-              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
-                {studentInfo.isActive ? 'Active' : 'Suspended'}
-              </div>
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
-                {studentInfo.isActive ? 'Active' : 'Suspended'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground text-white mt-1">
-              {studentInfo.isActive ? 'Account operational' : 'Account restricted'}
             </p>
           </CardContent>
         </Card>

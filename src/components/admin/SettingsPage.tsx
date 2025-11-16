@@ -465,7 +465,7 @@ export function SettingsPage() {
                   type="password"
                   value={editCashierData.password}
                   onChange={(e) => setEditCashierData(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="Optional"
+                  placeholder="Change password"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">

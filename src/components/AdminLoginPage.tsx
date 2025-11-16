@@ -7,69 +7,51 @@ import { useAuth } from '@/contexts/AuthContext';
 import { authService } from '@/lib/services';
 import { DottedSeparator } from './ui/dotted-line';
 
-
-export function LoginPage() {
+export function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [studentId, setStudentId] = useState('');
+  const [adminId, setAdminId] = useState('');
   const { login } = useAuth();
 
-  // Load saved student ID on mount
+  
   useEffect(() => {
-    const savedStudentId = localStorage.getItem('remembered_student_id');
-    if (savedStudentId) {
-      setStudentId(savedStudentId);
+    const savedAdminId = localStorage.getItem('remembered_admin_id');
+    if (savedAdminId) {
+      setAdminId(savedAdminId);
       setRememberMe(true);
     }
   }, []);
 
-  const handleStudentLogin = async (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      
-      const { settingsService } = await import('@/lib/services');
-      const isMaintenance = await settingsService.isSystemInMaintenance();
-      
-      if (isMaintenance) {
-        toast.error('System is currently under maintenance. Please try again later.');
-        setIsLoading(false);
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking maintenance status:', error);
-      
-    }
-
-    const formStudentId = (e.target as HTMLFormElement).studentId?.value;
+    const formAdminId = (e.target as HTMLFormElement).adminId?.value;
     const password = (e.target as HTMLFormElement).password?.value;
 
-    if (!formStudentId || !password) {
+    if (!formAdminId || !password) {
       toast.error('Please fill in all fields');
       setIsLoading(false);
       return;
     }
 
-    // Save or clear student ID based on remember me checkbox
+    
     if (rememberMe) {
-      localStorage.setItem('remembered_student_id', formStudentId);
+      localStorage.setItem('remembered_admin_id', formAdminId);
     } else {
-      localStorage.removeItem('remembered_student_id');
+      localStorage.removeItem('remembered_admin_id');
     }
 
     try {
+      const result = await authService.loginAdmin(formAdminId, password);
       
-      const result = await authService.loginStudent(formStudentId, password);
-      
-      
-      await login('student', result.student);
-      toast.success('Student login successful!');
+      await login('admin', result.admin);
+      toast.success('Admin login successful!');
     } catch (error: any) {
-      console.error('Student login error:', error);
+      console.error('Admin login error:', error);
       
       if (error.code === 401) {
-        toast.error('Invalid student ID or password');
+        toast.error('Invalid administrator ID or password');
       } else if (error.message) {
         toast.error(error.message);
       } else {
@@ -88,24 +70,24 @@ export function LoginPage() {
             <img src="/logo/Logo.svg" alt="CanSys" className="h-9 w-9" />      
           </div>
           <div className="text-start">
-            <h2 className="text-2xl mt-[-10px] font-bold text-gray-800"><span className='text-green-500'>Student</span> Login</h2>
+            <h2 className="text-2xl mt-[-10px] font-bold text-gray-800"><span className='text-green-500'>Admin</span> Login</h2>
             <p className="text-xs mt-1 text-gray-600">Enter login-in details to access your account.</p>
           </div>
 
           <DottedSeparator className="py-3"/>    
-          <form onSubmit={handleStudentLogin} className="space-y-5">
+          <form onSubmit={handleAdminLogin} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="studentId" className="text-sm font-medium text-gray-900">
-                Student ID
+              <Label htmlFor="adminId" className="text-sm font-medium text-gray-900">
+                Administrator ID
               </Label>
               <Input
-                id="studentId"
-                name="studentId"
+                id="adminId"
+                name="adminId"
                 type="text"
-                placeholder="Enter your student ID"
+                placeholder="Enter your administrator ID"
                 className="h-11"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
+                value={adminId}
+                onChange={(e) => setAdminId(e.target.value)}
                 required
               />
             </div>
@@ -134,14 +116,14 @@ export function LoginPage() {
                 onChange={(e) => {
                   setRememberMe(e.target.checked);
                   if (!e.target.checked) {
-                    localStorage.removeItem('remembered_student_id');
+                    localStorage.removeItem('remembered_admin_id');
                   }
                 }}
                 className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
-              <Label htmlFor="rememberMe" className="text-xs text-gray-700 cursor-pointer">
-                Remember me
-              </Label>
+                  <Label htmlFor="rememberMe" className="text-xs text-gray-700 cursor-pointer">
+                    Remember me
+                  </Label>
             </div>
 
             <Button 
@@ -157,3 +139,4 @@ export function LoginPage() {
     </div>
   );
 }
+

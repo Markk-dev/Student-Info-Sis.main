@@ -18,7 +18,7 @@ interface LineSeparatorProps{
 
 export const DottedSeparator = ({
     className,
-    color = "#d4d4d8",
+    color = "#E5E7EB",
     height = "2px",
     dotSize = "2px",
     gapSize = "6px",

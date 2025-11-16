@@ -922,16 +922,8 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                         {payWithToken ? 'Cancel Pay with Token' : 'Pay with Token'}
                       </Button>
                     </div>
-                    {addTokenMode && (
-                      <p className="text-xs text-blue-600">
-                        Enter the amount of token you wish to add
-                      </p>
-                    )}
-                    {payWithToken && (
-                      <p className="text-xs text-green-600">
-                        Pay with token: Token balance will be used for payment
-                      </p>
-                    )}
+                    {addTokenMode}
+                    {payWithToken}
                   </div>
                 </>
               )}
@@ -940,7 +932,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         </CardContent>
       </Card>
 
-      {/* Transaction/Registration Section */}
+  
       <Card>
         {isNewStudent && (
           <CardHeader className="p-4">
@@ -1060,14 +1052,16 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                   <h3 className="text-base font-semibold">Process Transaction</h3>
                   <p className="text-xs text-gray-600">Enter amounts and process payment</p>
                 </div>
-                <div className="bg-gray-50 p-2 rounded-lg border w-28">
-                  <div className="text-center">
-                    <div className="text-xs text-gray-600 mb-0.5">Change</div>
-                    <div className={`text-xl font-bold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ₱{change.toFixed(2)}
+                {!addTokenMode && (
+                  <div className="bg-gray-50 p-2 rounded-lg border w-28">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-600 mb-0.5">Change</div>
+                      <div className={`text-xl font-bold ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ₱{change.toFixed(2)}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {!addTokenMode && (

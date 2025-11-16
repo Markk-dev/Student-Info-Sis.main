@@ -1,6 +1,6 @@
 import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
-import { RegisterPage } from './components/RegisterPage';
+import { AdminLoginPage } from './components/AdminLoginPage';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { StudentDashboard } from './components/student/StudentDashboard';
 import { useAuth } from './contexts/AuthContext';
@@ -19,7 +19,8 @@ function AppContent() {
   const { user, loading, logout } = useAuth();
   
   // Simple routing based on URL path
-  const isRegisterPage = window.location.pathname === '/register';
+  const pathname = window.location.pathname;
+  const isAdminAuthPage = pathname === '/admin';
 
   // Change password state
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -27,7 +28,7 @@ function AppContent() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
       // Clear any stored authentication data
       localStorage.removeItem('authToken');
@@ -37,7 +38,10 @@ function AppContent() {
       toast.success('Logged out successfully');
       
       // Call the logout function from AuthContext
-      logout();
+      await logout();
+      
+      // Redirect to student login
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout error:', error);
       toast.error('Error during logout');
@@ -66,13 +70,20 @@ function AppContent() {
     }
     
     try {
-      // Update password in database using student service
-      const { studentService } = await import('@/lib/services');
-      
-      // For now, we'll use a simple approach - in a real app, you'd hash the password
+      const { studentService, authService } = await import('@/lib/services');
       const studentData = user.data as Student;
+      
+      // Verify old password by attempting to login with it
+      try {
+        await authService.loginStudent(studentData.studentId, oldPassword);
+      } catch (error) {
+        toast.error('Current password is incorrect');
+        return;
+      }
+      
+      // Update password in database
       await studentService.updateStudent(studentData.studentId, {
-        password: newPassword // In production, this should be hashed
+        password: newPassword
       });
       
       toast.success('Password changed successfully');
@@ -80,9 +91,13 @@ function AppContent() {
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error changing password:', error);
-      toast.error('Failed to change password');
+      if (error.message && error.message.includes('Current password')) {
+        // Already handled above
+        return;
+      }
+      toast.error('Failed to change password. Please try again.');
     }
   };
 
@@ -100,7 +115,7 @@ function AppContent() {
   if (!user) {
     return (
       <>
-        {isRegisterPage ? <RegisterPage /> : <LoginPage />}
+        {isAdminAuthPage ? <AdminLoginPage /> : <LoginPage />}
         <Toaster position="top-right" />
       </>
     );
