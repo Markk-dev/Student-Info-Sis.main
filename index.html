@@ -3,11 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>University Canteen Management System</title>
     <!-- Geist Fonts -->
     <link rel="stylesheet" href="https://fonts.vercel.com/geist-sans.css" />
     <link rel="stylesheet" href="https://fonts.vercel.com/geist-mono.css" />
+    <style>
+      /* Mobile keyboard handling */
+      @media (max-width: 768px) {
+        /* Ensure modal content is scrollable when keyboard appears */
+        [data-radix-dialog-content] {
+          max-height: 100vh !important;
+          height: auto !important;
+        }
+        
+        /* Handle virtual keyboard overlay */
+        @supports (height: 100dvh) {
+          [data-radix-dialog-content] {
+            max-height: 100dvh !important;
+          }
+        }
+        
+        /* Ensure inputs don't get hidden behind keyboard */
+        input:focus {
+          transform: translateY(-50px);
+          transition: transform 0.3s ease;
+        }
+        
+        /* Reset transform when not focused */
+        input:not(:focus) {
+          transform: translateY(0);
+          transition: transform 0.3s ease;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

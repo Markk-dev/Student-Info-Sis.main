@@ -774,10 +774,21 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                       ref={inputRef}
                       id="student-id"
                       type="text"
+                      inputMode="numeric"
                       placeholder="Type or scan Student ID (searches automatically)"
                       value={studentId}
                       onChange={handleInputChange}
                       onKeyDown={handleBarcodeInput}
+                      onBlur={() => {
+                        // On mobile, blur the input to dismiss keyboard when user taps elsewhere
+                        if (window.innerWidth <= 768) {
+                          setTimeout(() => {
+                            if (document.activeElement !== inputRef.current) {
+                              inputRef.current?.blur();
+                            }
+                          }, 100);
+                        }
+                      }}
                       className="h-9 w-full border-2 border-green-500 focus:border-green-600"
                       autoFocus
                       autoComplete="off"
@@ -1200,6 +1211,27 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     }} 
                   />
                 )}
+                {/* Mobile keyboard dismiss button */}
+                <div className="sm:hidden mb-2">
+                  <Button
+                    onClick={() => {
+                      // Dismiss keyboard on mobile
+                      if (inputRef.current) {
+                        inputRef.current.blur();
+                      }
+                      // Also blur any other focused inputs
+                      if (document.activeElement instanceof HTMLInputElement) {
+                        document.activeElement.blur();
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    Dismiss Keyboard
+                  </Button>
+                </div>
+                
                 <Button
                   onClick={isAddingToken ? cancelAddToken : handleProcessTransaction}
                   disabled={

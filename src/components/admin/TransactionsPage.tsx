@@ -1067,7 +1067,8 @@ export function TransactionsPage() {
 
       {/* Barcode Scanner Modal */}
       <Dialog open={showBarcodeScanner} onOpenChange={setShowBarcodeScanner}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto sm:max-h-[90vh] max-h-[100vh] p-2 sm:p-6">
+          <div className="max-h-[calc(100vh-8rem)] sm:max-h-[calc(90vh-4rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Process New Transaction</DialogTitle>
             <DialogDescription>
@@ -1076,6 +1077,7 @@ export function TransactionsPage() {
           </DialogHeader>
 
           <BarcodeScanner onAddTransaction={handleNewTransaction} />
+          </div>
         </DialogContent>
       </Dialog>
 
