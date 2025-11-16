@@ -6,6 +6,7 @@ import { AuthLayout } from './layout';
 import { toast } from 'sonner';
 import { authService } from '@/lib/services';
 import { useAuth } from '@/contexts/AuthContext';
+import { Student } from '@/lib/appwrite';
 
 export function RegisterPage() {
   const { login } = useAuth();
@@ -85,7 +86,6 @@ export function RegisterPage() {
     }
 
     try {
-      
       const result = await authService.registerStudent({
         studentId: formData.studentId,
         email: formData.email,
@@ -96,20 +96,7 @@ export function RegisterPage() {
         yearLevel: formData.yearLevel
       });
 
-      
-      const studentData = {
-        studentId: formData.studentId,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        password: formData.password,
-        course: formData.course,
-        yearLevel: formData.yearLevel,
-        isActive: true,
-        balance: 0
-      };
-      
-      await login('student', studentData);
+      await login('student', result.student as unknown as Student);
       
       toast.success('Registration successful! Welcome to your dashboard.');
       

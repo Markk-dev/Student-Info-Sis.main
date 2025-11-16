@@ -27,7 +27,7 @@ interface Transaction {
   totalItemAmount?: number; // Total of item prices
   timestamp: Date;
   cashier: string;
-  status: 'Paid' | 'Partial' | 'Credit' | 'completed' | 'pending' | 'refunded';
+  status: 'Paid' | 'Partial' | 'Credit' | 'completed' | 'pending' | 'refunded' | 'Bought Token' | 'Paid (Token)';
 }
 
 export function TransactionsPage() {
@@ -810,7 +810,7 @@ export function TransactionsPage() {
                       }>
                         ₱{(transaction.status === 'Bought Token' 
                           ? Math.abs(transaction.totalItemAmount || transaction.amount || 0)
-                          : transaction.status === 'Paid (Token)' || transaction.status === 'Paid'
+                          : (transaction.status === 'Paid (Token)' || transaction.status === 'Paid')
                           ? Math.abs(transaction.totalItemAmount || transaction.amount || 0)
                           : Math.abs(transaction.amount || 0)
                         ).toFixed(2)}

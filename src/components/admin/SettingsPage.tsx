@@ -7,8 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { Plus, Edit, Trash2, UserPlus, Shield, Database, Bell, Clock, AlertOctagon } from 'lucide-react';
+import { Plus, Edit, Trash2, UserPlus, Database, Bell, AlertOctagon } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminService, settingsService } from '@/lib/services';
 
@@ -22,29 +21,7 @@ interface CashierAccount {
   createdAt: Date;
 }
 
-interface SystemSettings {
-  currency: string;
-  dateFormat: string;
-  timezone: string;
-  enableNotifications: boolean;
-  enableAutoBackup: boolean;
-  requireReceiptPrint: boolean;
-  maxTransactionAmount: number;
-  sessionTimeout: number;
-}
-
 export function SettingsPage() {
-  const [settings, setSettings] = useState<SystemSettings>({
-    currency: 'PHP',
-    dateFormat: 'MM/dd/yyyy',
-    timezone: 'Asia/Manila',
-    enableNotifications: true,
-    enableAutoBackup: true,
-    requireReceiptPrint: false,
-    maxTransactionAmount: 1000,
-    sessionTimeout: 30
-  });
-
   // Temporary workaround: use maxDailySpend as maintenance flag
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [dbStatus, setDbStatus] = useState<'connected' | 'error'>('connected');
@@ -123,10 +100,6 @@ export function SettingsPage() {
         try {
           const settingsResponse = await settingsService.getSettings();
           if (settingsResponse) {
-            setSettings(prev => ({
-              ...prev,
-              ...settingsResponse
-            }));
             // Fix: Check if maxDailySpend is 0 (maintenance mode)
             const isMaintenance = settingsResponse.maxDailySpend === 0;
             setMaintenanceMode(isMaintenance);
@@ -147,24 +120,6 @@ export function SettingsPage() {
 
     loadData();
   }, []);
-
-  const handleSettingChange = async (key: string, value: any) => {
-    try {
-      
-      setSettings(prev => ({ ...prev, [key]: value }));
-      
-      
-      await settingsService.updateSettings({ [key]: value });
-      
-      toast.success('Setting updated successfully');
-    } catch (error) {
-      console.error('Error updating setting:', error);
-      toast.error('Failed to update setting');
-      
-      
-      setSettings(prev => ({ ...prev, [key]: !value }));
-    }
-  };
 
   const handleAddCashier = async () => {
     if (!newCashier.name || !newCashier.username || !newCashier.password) {
@@ -208,27 +163,6 @@ export function SettingsPage() {
     } catch (error) {
       console.error('Error creating cashier:', error);
       toast.error('Failed to create cashier account');
-    }
-  };
-
-  const toggleCashierStatus = async (id: string) => {
-    try {
-      const cashier = cashiers.find(c => c.id === id);
-      if (!cashier) return;
-
-      await adminService.updateAdmin(id, { isActive: !cashier.isActive });
-      
-      setCashiers(prev => 
-        prev.map(c => 
-          c.id === id 
-            ? { ...c, isActive: !c.isActive }
-            : c
-        )
-      );
-      toast.success(`Cashier account ${!cashier.isActive ? 'activated' : 'deactivated'}`);
-    } catch (error) {
-      console.error('Error updating cashier status:', error);
-      toast.error('Failed to update cashier status');
     }
   };
 
@@ -317,16 +251,6 @@ export function SettingsPage() {
     setShowDeleteCashier(true);
   };
 
-  const exportData = (type: string) => {
-    
-    toast.success(`${type} data exported successfully`);
-  };
-
-  const importData = () => {
-    
-    toast.success('Data imported successfully');
-  };
-
   const formatDate = (date: Date) => {
     if (!date || isNaN(date.getTime())) {
       return 'Invalid Date';
@@ -335,16 +259,6 @@ export function SettingsPage() {
       year: 'numeric', 
       month: 'short', 
       day: 'numeric' 
-    });
-  };
-
-  const formatTime = (date: Date) => {
-    if (!date || isNaN(date.getTime())) {
-      return 'Invalid Time';
-    }
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
     });
   };
 
@@ -390,7 +304,6 @@ export function SettingsPage() {
                     try {
                       await settingsService.updateSettings({ maxDailySpend: checked ? 0 : 1000 });
                       setMaintenanceMode(checked);
-                      setSettings(prev => ({ ...prev, maxDailySpend: checked ? 0 : 1000 }));
                       toast.success(`System maintenance ${checked ? 'enabled' : 'disabled'}`);
                     } catch (error) {
                       console.error('Failed to update maintenance mode:', error);
@@ -414,7 +327,6 @@ export function SettingsPage() {
                         try {
                           await settingsService.updateSettings({ maxDailySpend: 1000 });
                           setMaintenanceMode(false);
-                          setSettings(prev => ({ ...prev, maxDailySpend: 1000 }));
                           toast.success('Maintenance mode disabled');
                         } catch (error) {
                           console.error('Failed to disable maintenance mode:', error);

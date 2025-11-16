@@ -1,11 +1,11 @@
-import { account, databases, DATABASE_ID, COLLECTIONS } from './appwrite';
+import { databases, DATABASE_ID, COLLECTIONS } from './appwrite';
 import { ID, Query } from 'appwrite';
 import type { Student, Admin, Transaction, Product, Order, Settings } from './appwrite';
 import { calculateDueDate, updateTransactionDueDate, isTransactionOverdue } from './paymentTracking';
 
-// Authentication Services
+
 export const authService = {
-  // Student Registration
+  
   async registerStudent(studentData: {
     studentId: string;
     email: string;
@@ -16,7 +16,7 @@ export const authService = {
     yearLevel: string;
   }) {
     try {
-      // Check if student already exists
+      
       const existingStudents = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.STUDENTS,
@@ -27,7 +27,7 @@ export const authService = {
         throw new Error('A student with this email already exists');
       }
 
-      // Check if student ID already exists
+      
       const existingStudentId = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.STUDENTS,
@@ -38,7 +38,7 @@ export const authService = {
         throw new Error('A student with this Student ID already exists');
       }
 
-      // Create student document in database only (no Appwrite auth)
+      
       const student = await databases.createDocument(
         DATABASE_ID,
         COLLECTIONS.STUDENTS,
@@ -53,7 +53,7 @@ export const authService = {
           yearLevel: studentData.yearLevel,
           balance: 0,
           cash: 0,
-          loyalty: 25, // Automatic 25 loyalty points for new students
+          loyalty: 25, 
           isActive: true
         }
       );
@@ -65,10 +65,10 @@ export const authService = {
     }
   },
 
-  // Student Login
+  
   async loginStudent(studentId: string, password: string) {
     try {
-      // Get student data from database by studentId
+      
       const students = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.STUDENTS,
@@ -81,12 +81,12 @@ export const authService = {
 
       const student = students.documents[0] as unknown as Student;
 
-      // Check password
+      
       if (student.password !== password) {
         throw new Error('Invalid password');
       }
 
-      // Check if student is active
+      
       if (!student.isActive) {
         throw new Error('Account is suspended');
       }
@@ -101,10 +101,10 @@ export const authService = {
     }
   },
 
-  // Admin Login
+  
   async loginAdmin(administratorId: string, password: string) {
     try {
-      // Get admin data from database by administrator_id
+      
       const admins = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.ADMINS,
@@ -117,12 +117,12 @@ export const authService = {
 
       const admin = admins.documents[0] as unknown as Admin;
 
-      // Check password
+      
       if (admin.password !== password) {
         throw new Error('Invalid password');
       }
 
-      // Check if admin is active
+      
       if (!admin.isActive) {
         throw new Error('Account is suspended');
       }
@@ -137,10 +137,10 @@ export const authService = {
     }
   },
 
-  // Logout
+  
   async logout() {
     try {
-      // Since we're not using Appwrite auth sessions, just return success
+      
       return { success: true };
     } catch (error) {
       console.error('Logout error:', error);
@@ -148,11 +148,11 @@ export const authService = {
     }
   },
 
-  // Get current user
+  
   async getCurrentUser() {
     try {
-      // Since we're not using Appwrite auth, return null
-      // The current user will be managed by React state instead
+      
+      
       return null;
     } catch (error) {
       console.error('Get current user error:', error);
@@ -161,7 +161,7 @@ export const authService = {
   }
 };
 
-// Student Services
+
 export const studentService = {
   async getStudents() {
     try {
@@ -216,7 +216,7 @@ export const studentService = {
     email?: string;
   }) {
     try {
-      // Check if student ID already exists
+      
       const existingStudentId = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.STUDENTS,
@@ -237,16 +237,16 @@ export const studentService = {
         firstName: firstName,
         lastName: lastName,
         email: providedEmail && providedEmail.length > 0 ? providedEmail : `${data.id}@quickregister.local`,
-        password: 'default123', // Default password
+        password: 'default123', 
         course: data.course,
         yearLevel: data.yearLevel,
         balance: 0,
         cash: 0,
-        loyalty: 25, // Automatic 25 loyalty points for new students
+        loyalty: 25, 
         isActive: true
       };
 
-      console.log('Creating student with data:', studentData); // Debug log
+      console.log('Creating student with data:', studentData); 
 
       const createdStudent = await databases.createDocument(
         DATABASE_ID,
@@ -255,7 +255,7 @@ export const studentService = {
         studentData
       );
 
-      console.log('Student created successfully:', createdStudent); // Debug log
+      console.log('Student created successfully:', createdStudent); 
 
       return {
         id: createdStudent.studentId,
@@ -267,14 +267,14 @@ export const studentService = {
       };
     } catch (error) {
       console.error('Create student error:', error);
-      console.error('Error details:', error instanceof Error ? error.message : String(error)); // More detailed error logging
+      console.error('Error details:', error instanceof Error ? error.message : String(error)); 
       throw error;
     }
   },
 
   async updateStudent(studentId: string, data: Partial<Student>) {
     try {
-      // First, find the student by studentId to get the Appwrite document $id
+      
       const students = await databases.listDocuments(
         DATABASE_ID,
         COLLECTIONS.STUDENTS,
@@ -287,7 +287,7 @@ export const studentService = {
 
       const student = students.documents[0];
 
-      // Now update using the Appwrite document $id
+      
       return await databases.updateDocument(DATABASE_ID, COLLECTIONS.STUDENTS, student.$id, data);
     } catch (error) {
       console.error('Update student error:', error);
@@ -304,7 +304,7 @@ export const studentService = {
     }
   },
 
-  // Check and update suspension status for all students
+  
   async checkSuspensionStatus() {
     try {
       const students = await this.getStudents();
@@ -314,7 +314,7 @@ export const studentService = {
         if (student.suspensionDate && student.isActive === false) {
           const suspensionEnd = new Date(student.suspensionDate);
 
-          // If suspension period has ended, reactivate the student
+          
           if (now > suspensionEnd) {
             await this.updateStudent(student.studentId, {
               isActive: true,
@@ -330,7 +330,7 @@ export const studentService = {
   }
 };
 
-// Admin Services
+
 export const adminService = {
   async getAdmins() {
     try {
@@ -378,7 +378,7 @@ export const adminService = {
   }
 };
 
-// Transaction Services
+
 export const transactionService = {
   async getTransactions() {
     try {
@@ -416,12 +416,12 @@ export const transactionService = {
     }
   },
 
-  // Payment tracking functions
+  
   async createTransactionWithDueDate(data: any) {
     try {
       const transaction = await this.createTransaction(data);
       
-      // Calculate and set due date for partial and credit transactions
+      
       if (data.status === 'Partial' || data.status === 'Credit') {
         const dueDate = calculateDueDate(new Date(), data.totalItemAmount);
         const isOverdue = isTransactionOverdue({
@@ -469,7 +469,7 @@ export const transactionService = {
   }
 };
 
-// Product Services
+
 export const productService = {
   async getProducts() {
     try {
@@ -499,7 +499,7 @@ export const productService = {
   }
 };
 
-// Order Services
+
 export const orderService = {
   async getOrders() {
     try {
@@ -529,7 +529,7 @@ export const orderService = {
   }
 };
 
-// Settings Services
+
 export const settingsService = {
   async getSettings() {
     try {
@@ -537,7 +537,7 @@ export const settingsService = {
       if (settings.documents.length > 0) {
         return settings.documents[0] as unknown as Settings;
       }
-      // Return default settings if none exist
+      
       return {
         canteenName: 'Canteen Management',
         operatingHours: { open: '7:00 AM', close: '8:00 PM' },
@@ -547,7 +547,7 @@ export const settingsService = {
       } as Settings;
     } catch (error) {
       console.error('Get settings error:', error);
-      // Return default settings on error
+      
       return {
         canteenName: 'Canteen Management',
         operatingHours: { open: '7:00 AM', close: '8:00 PM' },
@@ -563,10 +563,10 @@ export const settingsService = {
       const settings = await this.getSettings();
 
       if (settings.$id) {
-        // Update existing settings
+        
         return await databases.updateDocument(DATABASE_ID, COLLECTIONS.SETTINGS, settings.$id, data);
       } else {
-        // Create new settings document
+        
         return await databases.createDocument(DATABASE_ID, COLLECTIONS.SETTINGS, ID.unique(), {
           canteenName: 'Canteen Management',
           operatingHours: { open: '7:00 AM', close: '8:00 PM' },
@@ -585,12 +585,12 @@ export const settingsService = {
   async isSystemInMaintenance() {
     try {
       const settings = await this.getSettings();
-      // Temporary workaround: use maxDailySpend as maintenance flag
-      // 0 = maintenance mode, > 0 = normal mode
+      
+      
       return settings?.maxDailySpend === 0;
     } catch (error) {
       console.error('Check maintenance status error:', error);
-      return false; // Default to not in maintenance if error
+      return false; 
     }
   }
 }; 

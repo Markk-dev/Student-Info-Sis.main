@@ -42,14 +42,6 @@ export function DailyJobProcessor() {
     return nextRun;
   };
 
-  // Check if job has run today
-  const hasRunToday = () => {
-    if (!jobStatus.lastRun) return false;
-    const today = new Date();
-    const lastRun = new Date(jobStatus.lastRun);
-    return today.toDateString() === lastRun.toDateString();
-  };
-
   // Load overdue transactions
   const loadOverdueTransactions = async () => {
     try {
