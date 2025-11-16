@@ -14,10 +14,10 @@ interface BarcodeProps {
   plain?: boolean; // If true, removes white background wrapper
 }
 
-export function Barcode({ 
-  value, 
-  width = 2, 
-  height = 60, 
+export function Barcode({
+  value,
+  width = 2,
+  height = 60,
   displayValue = true,
   format = 'CODE128',
   className = '',
@@ -39,7 +39,7 @@ export function Barcode({
           background: plain ? 'transparent' : '#ffffff',
           lineColor: '#000000',
           // Improve scanning from screen
-          valid: function(valid) {
+          valid: function (valid: boolean) {
             return valid;
           }
         });
@@ -89,7 +89,7 @@ export function Barcode({
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
-      
+
       img.onload = () => {
         canvas.width = img.width;
         canvas.height = img.height;
@@ -105,7 +105,7 @@ export function Barcode({
           }
         });
       };
-      
+
       img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
     }
   };
