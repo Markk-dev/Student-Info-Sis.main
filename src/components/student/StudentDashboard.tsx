@@ -389,7 +389,7 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
           </CardContent>
         </Card>
 
-        <Card className='bg-green-500'>
+        <Card className='bg-green-500 hidden sm:block'>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-6">
             <CardTitle className="text-xs sm:text-sm font-medium text-white">Total Transactions</CardTitle>
             <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground text-white"/>

@@ -65,36 +65,36 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isProcessingTokenRef = useRef(false);
 
-  
+
   const filteredCourses = COURSES.filter(course =>
     course.toLowerCase().includes(courseSearch.toLowerCase())
   );
 
-  
+
   const totalItemPrices = itemPrices.reduce((sum, price) => {
     const numPrice = parseFloat(price) || 0;
     return sum + numPrice;
   }, 0);
 
-  
+
   const transactionAmountNum = parseFloat(transactionAmount) || 0;
   const change = transactionAmountNum - totalItemPrices;
 
-  
+
   const studentLoyalty = currentStudent?.loyalty || 0;
-  
+
   // In addTokenMode, only Paid is allowed and item prices are disabled
-  const isPaidDisabled = addTokenMode 
+  const isPaidDisabled = addTokenMode
     ? (!currentStudent?.isRegistered || transactionAmountNum <= 0)
     : (!currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum < totalItemPrices);
-  const isPartialDisabled = addTokenMode 
+  const isPartialDisabled = addTokenMode
     ? true // Disabled in addTokenMode
     : (!currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum >= totalItemPrices || transactionAmountNum === 0 || studentLoyalty < 90);
-  const isCreditDisabled = addTokenMode 
+  const isCreditDisabled = addTokenMode
     ? true // Disabled in addTokenMode
     : (!currentStudent?.isRegistered || totalItemPrices === 0 || transactionAmountNum > 0 || studentLoyalty < 100);
 
-  
+
   useEffect(() => {
     // In addTokenMode, automatically set to Paid when amount is entered
     if (addTokenMode) {
@@ -114,17 +114,17 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     const studentLoyalty = currentStudent?.loyalty || 0;
 
     if (transactionAmountNum === 0) {
-      
+
       if (studentLoyalty >= 100) {
         setTransactionStatus('Credit');
       } else {
         setTransactionStatus('');
       }
     } else if (transactionAmountNum >= totalItemPrices) {
-      
+
       setTransactionStatus('Paid');
     } else if (transactionAmountNum < totalItemPrices) {
-      
+
       if (studentLoyalty >= 90) {
         setTransactionStatus('Partial');
       } else {
@@ -133,24 +133,24 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     }
   }, [transactionAmountNum, totalItemPrices, currentStudent?.isRegistered, currentStudent?.loyalty, addTokenMode]);
 
-  
+
   const addItemPrice = () => {
     setItemPrices(prev => [...prev, '']);
   };
 
-  
+
   const updateItemPrice = (index: number, value: string) => {
     setItemPrices(prev => prev.map((price, i) => i === index ? value : price));
   };
 
-  
+
   const removeItemPrice = (index: number) => {
     if (itemPrices.length > 1) {
       setItemPrices(prev => prev.filter((_, i) => i !== index));
     }
   };
 
-  
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
@@ -170,7 +170,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
   const handleScan = useCallback(async (searchId?: string) => {
     const id = (searchId || studentId).trim();
-    
+
     if (!id || id.length < 6) {
       // If search is too short (less than 6 digits), clear current student
       setCurrentStudent(null);
@@ -183,9 +183,9 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       // Get full student data including loyalty points
       const studentsResponse = await studentService.getStudents();
       // First try exact match, then try starts with match
-      const fullStudent = studentsResponse.documents.find((s: any) => 
+      const fullStudent = studentsResponse.documents.find((s: any) =>
         s.studentId && s.studentId.toString() === id
-      ) || studentsResponse.documents.find((s: any) => 
+      ) || studentsResponse.documents.find((s: any) =>
         s.studentId && s.studentId.toString().startsWith(id)
       );
 
@@ -280,32 +280,32 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     }
   }, [addTokenMode, isAddingToken]);
 
-  
+
   useEffect(() => {
-    
+
     const focusInput = () => {
       if (inputRef.current && document.activeElement !== inputRef.current) {
         inputRef.current.focus();
       }
     };
-    
-    
+
+
     const timer = setTimeout(focusInput, 100);
-    
-    
+
+
     const handleFocusLoss = () => {
-      
+
       setTimeout(() => {
         if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
           focusInput();
         }
       }, 100);
     };
-    
-    
+
+
     window.addEventListener('focus', focusInput);
     document.addEventListener('click', handleFocusLoss);
-    
+
     return () => {
       clearTimeout(timer);
       window.removeEventListener('focus', focusInput);
@@ -313,8 +313,8 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     };
   }, []);
 
-  
-  
+
+
   // Handle Enter key in input field (for manual entry only)
   // Note: Barcode scanner Enter is handled by the global listener above
   const handleBarcodeInput = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -323,7 +323,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       if (scannerProcessedRef.current) {
         return;
       }
-      
+
       const scannedValue = studentId.trim();
       if (scannedValue) {
         console.log('Enter pressed manually - searching for:', scannedValue);
@@ -340,7 +340,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
     // Use currentStudent.id if available, otherwise fall back to studentId
     const studentIdToUse = currentStudent?.id || studentId.trim();
-    
+
     if (!studentIdToUse) {
       toast.error('Student ID is required');
       return;
@@ -366,7 +366,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       });
       setIsNewStudent(false);
       toast.success('Student registered successfully!');
-      
+
       // Clear registration form
       setNewStudentData({ firstName: '', lastName: '', course: '', yearLevel: '' });
     } catch (error: any) {
@@ -433,7 +433,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       await studentService.updateStudent(currentStudent.id, {
         cash: newCashBalance
       });
-      
+
       // Update local state to reflect the change
       setCurrentStudent({
         ...currentStudent,
@@ -530,7 +530,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     // Handle Pay with Token
     if (payWithToken) {
       const currentToken = currentStudent.token || 0;
-      
+
       // Check if token is sufficient
       if (currentToken <= 0) {
         // Check if loyalty points allow Partial/Credit
@@ -600,7 +600,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         await studentService.updateStudent(currentStudent.id, {
           cash: newCashBalance
         });
-        
+
         // Update local state to reflect the change
         setCurrentStudent({
           ...currentStudent,
@@ -652,26 +652,26 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const now = Date.now();
       const timeSinceLastKey = now - lastKeyTime;
-      
+
       // Capture alphanumeric characters
       if (/^[0-9a-zA-Z]$/.test(e.key)) {
         // If this is the first character, record the start time
         if (buffer.length === 0) {
           firstKeyTime = now;
         }
-        
+
         buffer += e.key;
         // Only track timing if this isn't the first key (first key has no previous time)
         if (buffer.length > 1) {
           keyTimes.push(timeSinceLastKey);
         }
-        
+
         // If we're building a buffer and keys are coming fast, prevent input field from updating
         // This helps ensure the buffer is used instead of the input field value
         if (buffer.length > 0 && timeSinceLastKey < 100) {
           // Don't prevent default here, but we'll handle it on Enter
         }
-        
+
         console.log('Buffer:', buffer, '| Time gap:', timeSinceLastKey, 'ms');
       }
 
@@ -688,45 +688,45 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
       if (e.key === 'Enter') {
         // Use buffer if available, otherwise fall back to input field value
         const valueToSearch = buffer.length >= 6 ? buffer : (inputRef.current?.value?.trim() || '');
-        
+
         if (valueToSearch.length >= 6) {
           // Check total time for the entire sequence (if we have a buffer)
           const totalTime = buffer.length > 0 ? (now - firstKeyTime) : 0;
           const timePerChar = buffer.length > 0 ? (totalTime / buffer.length) : 0;
-          
+
           // Calculate average time between keys
-          const avgTime = keyTimes.length > 0 
-            ? keyTimes.reduce((sum, t) => sum + t, 0) / keyTimes.length 
+          const avgTime = keyTimes.length > 0
+            ? keyTimes.reduce((sum, t) => sum + t, 0) / keyTimes.length
             : Infinity;
-          
+
           // ULTRA AGGRESSIVE DETECTION: 
           // Auto-search on ANY Enter press with a valid value UNLESS it's obviously very slow typing
           // Most barcode scanners complete in < 1 second, so anything reasonable should auto-search
           // Only exclude if it took more than 10 seconds (clearly manual typing with pauses)
           const isVerySlowTyping = totalTime > 10000;
-          
+
           // Auto-search for anything that's not obviously very slow
           if (!isVerySlowTyping) {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation(); // Stop all other handlers
-            
+
             console.log('✅ Barcode scanned - Auto searching:', valueToSearch, '| Buffer length:', buffer.length, '| Total time:', totalTime, 'ms', '| Avg time:', avgTime.toFixed(2), 'ms', '| Time per char:', timePerChar.toFixed(2), 'ms');
-            
+
             // Mark that we processed a scanner scan IMMEDIATELY
             scannerProcessedRef.current = true;
-            
+
             // Update state with the scanned value
             setStudentId(valueToSearch);
-            
+
             // Immediately search - use the value directly (bypasses debounce)
             handleScan(valueToSearch);
-            
+
             // Reset the flag after a delay
             setTimeout(() => {
               scannerProcessedRef.current = false;
             }, 500);
-            
+
             // Reset everything
             buffer = '';
             keyTimes = [];
@@ -737,7 +737,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
             console.log('Very slow typing detected - not auto-searching. Total time:', totalTime, 'ms', '| Avg time:', avgTime.toFixed(2), 'ms');
           }
         }
-        
+
         // If Enter is pressed but it's manual typing or no valid value, let the normal handler deal with it
         // Reset buffer for next time
         buffer = '';
@@ -761,68 +761,68 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-1">
-        {/* Student ID Section */}
-        <Card>
-          <CardContent className="space-y-3 p-4 pt-3">
-            {/* Manual ID Search */}
-            <div className=' flex flex-col gap-3 p-2'>
-              <div className="space-y-2">
-                <Label htmlFor="student-id" className="text-sm">Student ID Search</Label>
-                <div className="flex flex-col gap-1">
-                  <div className="flex gap-2">
-                    <Input
-                      ref={inputRef}
-                      id="student-id"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Type or scan Student ID (searches automatically)"
-                      value={studentId}
-                      onChange={handleInputChange}
-                      onKeyDown={handleBarcodeInput}
-                      onBlur={() => {
-                        // On mobile, blur the input to dismiss keyboard when user taps elsewhere
-                        if (window.innerWidth <= 768) {
-                          setTimeout(() => {
-                            if (document.activeElement !== inputRef.current) {
-                              inputRef.current?.blur();
-                            }
-                          }, 100);
-                        }
-                      }}
-                      className="h-9 w-full border-2 border-green-500 focus:border-green-600"
-                      autoFocus
-                      autoComplete="off"
-                    />
-                    <Button 
-                      onClick={() => {
-                        setStudentId('');
-                        setCurrentStudent(null);
-                        setIsNewStudent(false);
-                        inputRef.current?.focus();
-                      }} 
-                      disabled={!studentId.trim()} 
-                      size="sm"
-                      variant="outline"
-                      className="h-9 w-9 p-0"
-                      title="Clear field"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    <span className={`w-2 h-2 rounded-full ${isSearching ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></span>
-                    {isSearching ? 'Searching...' : studentId.length >= 6 ? 'Searching as you type...' : studentId.length > 0 ? `Type ${6 - studentId.length} more digit${6 - studentId.length > 1 ? 's' : ''} to search` : 'Type or scan Student ID (6+ digits)'}
-                  </p>
+      {/* Student ID Section */}
+      <Card>
+        <CardContent className="space-y-3 p-4 pt-3">
+          {/* Manual ID Search */}
+          <div className=' flex flex-col gap-3 p-2'>
+            <div className="space-y-2">
+              <Label htmlFor="student-id" className="text-sm">Student ID Search</Label>
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-2">
+                  <Input
+                    ref={inputRef}
+                    id="student-id"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Type or scan Student ID (searches automatically)"
+                    value={studentId}
+                    onChange={handleInputChange}
+                    onKeyDown={handleBarcodeInput}
+                    onBlur={() => {
+                      // On mobile, blur the input to dismiss keyboard when user taps elsewhere
+                      if (window.innerWidth <= 768) {
+                        setTimeout(() => {
+                          if (document.activeElement !== inputRef.current) {
+                            inputRef.current?.blur();
+                          }
+                        }, 100);
+                      }
+                    }}
+                    className="h-9 w-full border-2 border-green-500 focus:border-green-600"
+                    autoFocus
+                    autoComplete="off"
+                  />
+                  <Button
+                    onClick={() => {
+                      setStudentId('');
+                      setCurrentStudent(null);
+                      setIsNewStudent(false);
+                      inputRef.current?.focus();
+                    }}
+                    disabled={!studentId.trim()}
+                    size="sm"
+                    variant="outline"
+                    className="h-9 w-9 p-0"
+                    title="Clear field"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-
-              <div className='bg-blue-300'>
-
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <span className={`w-2 h-2 rounded-full ${isSearching ? 'bg-yellow-500 animate-pulse' : 'bg-green-500'}`}></span>
+                  {isSearching ? 'Searching...' : studentId.length >= 6 ? 'Searching as you type...' : studentId.length > 0 ? `Type ${6 - studentId.length} more digit${6 - studentId.length > 1 ? 's' : ''} to search` : 'Type or scan Student ID (6+ digits)'}
+                </p>
               </div>
             </div>
 
-            {/* Student Information Display */}
-            {currentStudent && (
+            <div className='bg-blue-300'>
+
+            </div>
+          </div>
+
+          {/* Student Information Display */}
+          {currentStudent && (
             <div className="space-y-3 pt-2">
               <Separator />
               <div className="space-y-2">
@@ -943,7 +943,7 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
         </CardContent>
       </Card>
 
-  
+
       <Card>
         {isNewStudent && (
           <CardHeader className="p-4">
@@ -1123,32 +1123,32 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                           disabled={!currentStudent?.isRegistered || addTokenMode}
                           className={`flex-1 h-9 ${price && parseFloat(price) > 0 ? 'text-green-500' : ''}`}
                         />
-                      {index > 0 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => removeItemPrice(index)}
-                          disabled={!currentStudent?.isRegistered}
-                          className="text-red-500 hover:text-red-700 h-8 w-8"
-                        >
-                          ×
-                        </Button>
-                      )}
-                      {index === itemPrices.length - 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={addItemPrice}
-                          disabled={!currentStudent?.isRegistered}
-                          className="h-8 w-8"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                        {index > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removeItemPrice(index)}
+                            disabled={!currentStudent?.isRegistered}
+                            className="text-red-500 hover:text-red-700 h-8 w-8"
+                          >
+                            ×
+                          </Button>
+                        )}
+                        {index === itemPrices.length - 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={addItemPrice}
+                            disabled={!currentStudent?.isRegistered}
+                            className="h-8 w-8"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                     {totalItemPrices > 0 && (
                       <div className="text-xs text-gray-600">
                         Total Item Price: ₱{totalItemPrices.toFixed(2)}
@@ -1202,13 +1202,13 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
 
               <div className="relative w-full overflow-hidden rounded-md">
                 {isAddingToken && (
-                  <div 
-                    className="absolute inset-0 bg-red-500 rounded-md transition-all duration-1000 ease-linear" 
-                    style={{ 
+                  <div
+                    className="absolute inset-0 bg-red-500 rounded-md transition-all duration-1000 ease-linear"
+                    style={{
                       width: `${((5 - countdownSeconds) / 5) * 100}%`,
                       right: 0,
                       transition: 'width 1s linear'
-                    }} 
+                    }}
                   />
                 )}
                 {/* Mobile keyboard dismiss button */}
@@ -1231,12 +1231,12 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                     Dismiss Keyboard
                   </Button>
                 </div>
-                
+
                 <Button
                   onClick={isAddingToken ? cancelAddToken : handleProcessTransaction}
                   disabled={
-                    !currentStudent?.isRegistered || 
-                    (addTokenMode 
+                    !currentStudent?.isRegistered ||
+                    (addTokenMode
                       ? (isAddingToken ? false : transactionAmountNum <= 0)
                       : (!transactionStatus || totalItemPrices === 0 || (change < 0 && transactionStatus !== 'Credit' && transactionStatus !== 'Partial') || (transactionStatus !== 'Credit' && transactionStatus !== 'Partial' && !transactionAmount)))
                   }
@@ -1244,10 +1244,10 @@ export function BarcodeScanner({ onAddTransaction }: BarcodeScannerProps) {
                   size="sm"
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
-                  {isAddingToken 
-                    ? `Cancel (${countdownSeconds}s)` 
-                    : addTokenMode 
-                      ? 'Buy Token' 
+                  {isAddingToken
+                    ? `Cancel (${countdownSeconds}s)`
+                    : addTokenMode
+                      ? 'Buy Token'
                       : 'Process Transaction'}
                 </Button>
               </div>
