@@ -526,11 +526,11 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
                       }`}>
                       ₱{transaction.amount.toFixed(2)}
                     </p>
-                    <Badge variant="outline" className={`text-xs w-fit ${transaction.status === 'Partial'
+                    <Badge variant="outline" className={`text-[9px] sm:text-xs px-1 sm:px-2 py-0.5 sm:py-1 w-fit max-w-[70px] sm:max-w-none truncate leading-tight ${transaction.status === 'Partial'
                         ? 'bg-yellow-200 text-yellow-900 border-yellow-300'
                         : ''
                       }`}>
-                      {transaction.status}
+                      <span className="block truncate">{transaction.status}</span>
                     </Badge>
                   </div>
                 </div>
