@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, PhilippinePeso, ShoppingCart, CreditCard, Wallet } from 'lucide-react';
+import { TrendingUp, PhilippinePeso, ShoppingCart, CreditCard, Wallet, ShoppingBag, CirclePoundSterling, Check, Circle, CircleAlert } from 'lucide-react';
 import { transactionService, studentService } from '@/lib/services';
 import { getUpcomingDuePayments, getDueDateCountdown, getPaymentAlarmLevel } from '@/lib/paymentTracking';
 import { format } from 'date-fns';
@@ -526,18 +526,20 @@ export function StudentDashboard({ studentData }: StudentDashboardProps) {
                       }`}>
                       ₱{transaction.amount.toFixed(2)}
                     </p>
-                    <Badge variant="outline" className={`text-[7px] sm:text-xs px-0.5 sm:px-2 py-0 sm:py-1 w-fit max-w-[45px] sm:max-w-none truncate leading-none h-3 sm:h-auto flex items-center justify-center ${transaction.status === 'Partial'
+                    <Badge variant="outline" className={`text-[7px] sm:text-xs px-0.5 sm:px-2 py-0 sm:py-1 w-fit max-w-[20px] sm:max-w-none truncate leading-none h-3 sm:h-auto flex items-center justify-center ${transaction.status === 'Partial'
                       ? 'bg-yellow-200 text-yellow-900 border-yellow-300'
                       : ''
                       }`}>
-                      <span className="truncate">
-                        <span className="sm:hidden">
-                          {transaction.status === 'Bought Token' ? 'Token' : 
-                           transaction.status === 'Paid (Token)' ? 'Paid' : 
-                           transaction.status}
-                        </span>
-                        <span className="hidden sm:inline">{transaction.status}</span>
+                      {/* Mobile: Show only icon */}
+                      <span className="sm:hidden flex items-center justify-center">
+                        {transaction.status === 'Bought Token' && <ShoppingBag className="h-2 w-2" />}
+                        {transaction.status === 'Paid (Token)' && <CirclePoundSterling className="h-2 w-2" />}
+                        {transaction.status === 'Paid' && <Check className="h-2 w-2" />}
+                        {transaction.status === 'Partial' && <Circle className="h-2 w-2" />}
+                        {transaction.status === 'Credit' && <CircleAlert className="h-2 w-2" />}
                       </span>
+                      {/* Tablet/Desktop: Show text */}
+                      <span className="hidden sm:inline truncate">{transaction.status}</span>
                     </Badge>
                   </div>
                 </div>

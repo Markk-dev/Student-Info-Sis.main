@@ -87,7 +87,18 @@ export const authService = {
       const student = students.documents[0] as unknown as Student;
 
       
-      const isPasswordValid = await bcrypt.compare(password, student.password);
+      // Handle both hashed and plaintext passwords during migration
+      let isPasswordValid = false;
+      
+      // Check if password is already hashed (bcrypt hashes start with $2)
+      if (student.password.startsWith('$2')) {
+        // Password is hashed, use bcrypt compare
+        isPasswordValid = await bcrypt.compare(password, student.password);
+      } else {
+        // Password is still plaintext, do direct comparison
+        isPasswordValid = student.password === password;
+      }
+      
       if (!isPasswordValid) {
         throw new Error('Invalid password');
       }
@@ -124,7 +135,18 @@ export const authService = {
       const admin = admins.documents[0] as unknown as Admin;
 
       
-      const isPasswordValid = await bcrypt.compare(password, admin.password);
+      // Handle both hashed and plaintext passwords during migration
+      let isPasswordValid = false;
+      
+      // Check if password is already hashed (bcrypt hashes start with $2)
+      if (admin.password.startsWith('$2')) {
+        // Password is hashed, use bcrypt compare
+        isPasswordValid = await bcrypt.compare(password, admin.password);
+      } else {
+        // Password is still plaintext, do direct comparison
+        isPasswordValid = admin.password === password;
+      }
+      
       if (!isPasswordValid) {
         throw new Error('Invalid password');
       }
