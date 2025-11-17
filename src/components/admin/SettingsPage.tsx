@@ -7,9 +7,10 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, UserPlus, Database, Bell, AlertOctagon } from 'lucide-react';
+import { Plus, Edit, Trash2, UserPlus, Database, Bell, AlertOctagon, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { adminService, settingsService } from '@/lib/services';
+import { migratePasswordsToHash } from '@/lib/passwordMigration';
 
 interface CashierAccount {
   id: string;
@@ -344,7 +345,48 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        
+        {/* Password Security */}
+        <Card>
+          <CardHeader className="p-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Shield className="h-5 w-5" />
+              Password Security
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Migrate existing passwords to secure hashed format
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 pt-0 space-y-4">
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-blue-900">Password Migration</p>
+                  <p className="text-xs text-blue-700">
+                    This will convert all existing plaintext passwords to secure hashed format using bcrypt.
+                    This is a one-time operation and is highly recommended for security.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        toast.info('Starting password migration...');
+                        const result = await migratePasswordsToHash();
+                        toast.success(result.message);
+                      } catch (error) {
+                        console.error('Password migration failed:', error);
+                        toast.error('Password migration failed. Check console for details.');
+                      }
+                    }}
+                    className="mt-2"
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Migrate Passwords
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* User Management */}

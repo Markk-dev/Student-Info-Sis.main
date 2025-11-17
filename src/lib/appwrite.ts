@@ -115,4 +115,4 @@ export interface Settings {
   currency: string;
   taxRate: number;
   updatedAt?: string;
-} 
+}

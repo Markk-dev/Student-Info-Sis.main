@@ -2,6 +2,7 @@ import { databases, DATABASE_ID, COLLECTIONS } from './appwrite';
 import { ID, Query } from 'appwrite';
 import type { Student, Admin, Transaction, Product, Order, Settings } from './appwrite';
 import { calculateDueDate, updateTransactionDueDate, isTransactionOverdue } from './paymentTracking';
+import bcrypt from 'bcryptjs';
 
 
 export const authService = {
@@ -38,6 +39,10 @@ export const authService = {
         throw new Error('A student with this Student ID already exists');
       }
 
+      // Hash the password before storing
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(studentData.password, saltRounds);
+
       
       const student = await databases.createDocument(
         DATABASE_ID,
@@ -48,7 +53,7 @@ export const authService = {
           firstName: studentData.firstName,
           lastName: studentData.lastName,
           email: studentData.email,
-          password: studentData.password,
+          password: hashedPassword,
           course: studentData.course,
           yearLevel: studentData.yearLevel,
           balance: 0,
@@ -82,7 +87,8 @@ export const authService = {
       const student = students.documents[0] as unknown as Student;
 
       
-      if (student.password !== password) {
+      const isPasswordValid = await bcrypt.compare(password, student.password);
+      if (!isPasswordValid) {
         throw new Error('Invalid password');
       }
 
@@ -118,7 +124,8 @@ export const authService = {
       const admin = admins.documents[0] as unknown as Admin;
 
       
-      if (admin.password !== password) {
+      const isPasswordValid = await bcrypt.compare(password, admin.password);
+      if (!isPasswordValid) {
         throw new Error('Invalid password');
       }
 
@@ -232,12 +239,16 @@ export const studentService = {
 
       const providedEmail = data.email?.trim();
 
+      // Hash the default password (student ID)
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(data.id, saltRounds);
+
       const studentData = {
         studentId: data.id,
         firstName: firstName,
         lastName: lastName,
         email: providedEmail && providedEmail.length > 0 ? providedEmail : `${data.id}@quickregister.local`,
-        password: data.id, // Use student ID as default password
+        password: hashedPassword, // Use hashed student ID as default password
         course: data.course,
         yearLevel: data.yearLevel,
         balance: 0,

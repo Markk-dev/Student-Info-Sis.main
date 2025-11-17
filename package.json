@@ -24,6 +24,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@zxing/library": "^0.21.3",
     "appwrite": "^13.0.1",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
@@ -42,6 +43,7 @@
     "tailwind-merge": "^2.0.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/jsbarcode": "^3.11.4",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.37",
